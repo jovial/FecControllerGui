@@ -35,78 +35,27 @@ import scalafx.animation.Timeline
 import scalafx.animation.KeyFrame
 import javafx.util.Duration
 import scalafx.geometry.Pos
+import scalafx.scene.layout.Region
+import scalafx.scene.control.Label
+import scalafx.beans.property.DoubleProperty
+import scalafx.scene.Group
+
+
 
 object HelloStageDemo extends JFXApp {
+  
+  val power = new StringProperty(){
+    value = "0"
+  }
+  
+  val powerLabel = "Power/w"
+  
+  val telemetryProps = Array((powerLabel, power),(powerLabel, power),(powerLabel, power),(powerLabel, power),(powerLabel, power),(powerLabel, power));
 
-  val test = StringProperty("boo")
 
   def genSplit: Parent = {
 
-    val leftSide = new TilePane {
-      padding = Insets(5)
-      vgap = 5
-      hgap = 5
-      prefColumns = 3
-    }
-    
-     val test = new GridPane() {
-       padding = Insets(5)
-       hgrow = Priority.Always
-       vgrow = Priority.Always
-       style = "-fx-background-color: red"
-     }
-     
-   val columnConstraints = new ColumnConstraints() {
-       hgrow = Priority.Always;
-   }
-   
-   val nColumns = 3;
-   
-   for (a <- 1 to nColumns) {
-     test.columnConstraints += columnConstraints
-   }
-     
-    
-
-    for (a <- 1 to 10) {
-
-//      val test = new VBox {
-//        hgrow = Priority.Always
-//        padding = Insets(20)
-//        spacing = 5
-//      }
-
-      
-     val label = new Text("Power/w") {
-          //  style = "-fx-font-size: 40%"
-      }
-       
-     val value = new Text("300") {
-        //    style = "-fx-font-size: 100%"
-      }
-     
-     val vbox = new VBox{
-         hgrow = Priority.Always
-         vgrow = Priority.Always
-         children = Seq(label, value)
-         maxHeight = 1000
-         alignment = Pos.Center
-     }
-     
-     
-     vbox.height.onChange {
-       (s,o,n) => {
-         label.font = new Font(n.doubleValue() * 0.1)
-         value.font = new Font(n.doubleValue() * 0.2)
-       }
-     }
-
-     GridPane.setRowIndex(vbox, (a-1) / nColumns)
-     GridPane.setColumnIndex(vbox, (a-1) % nColumns)
-
-    
-    test.children += vbox
-    }
+    val telemetryGrid = mkTelemetryGrid()
 
     val rightSide = new GridPane {
       children = Seq(
@@ -118,19 +67,124 @@ object HelloStageDemo extends JFXApp {
     val split = new SplitPane {
       padding = Insets(20)
       dividerPositions_=(0.80, 0.20)
-      items ++= Seq(test, rightSide);
+      items ++= Seq(telemetryGrid, rightSide);
     }
-
+    
     split
   }
+  
+
+  def mkTelemetryGrid() = {
+    val telemetryGrid = new GridPane() {
+      padding = Insets(10)
+      style = "-fx-background-color: red"
+    }
+      
+    val columnConstraints = new ColumnConstraints() {
+        hgrow = Priority.Always;
+    }
+    
+    val nColumns = 3;
+    
+    for (a <- 1 to nColumns) {
+      telemetryGrid.columnConstraints += columnConstraints
+   }
+    
+
+    var cells = List[Node]()
+
+    for (a <- 0 until telemetryProps.length) {
+
+      
+     val label = new Label {
+            text = telemetryProps(a)._1
+      }
+     
+     //label.setScaleX(10);
+     //label.setScaleY(10);
+     
+       
+     val value = new Text {
+        text <== telemetryProps(a)._2
+        style = "-fx-font-size: 200%"
+      }
+     
+     val labelDataPair = new VBox() {
+       children = Seq(label, value)
+     }
+     
+     // group so that scaling children updates bounds
+     val g = new Group() {
+       children = Seq(labelDataPair)
+       hgrow = Priority.Always
+       vgrow = Priority.Always
+     }
+     
+     val gridCell = new VBox{
+         padding = Insets(10)
+         hgrow = Priority.Always
+         children = Seq(g)
+         alignment = Pos.Center
+     }
+     
+     
+     telemetryGrid.height.onChange( {
+       (_,_,newVal) => {
+         val size = newVal.doubleValue();
+         //vbox.setStyle("-fx-font-size:" + size)
+         power.value = size.toString()
+         val scale = size / 400 * 1.0;
+         for (x <- g.children) {
+           x.setScaleX(scale)
+           x.setScaleY(scale)
+         }
+       }
+     })
+     
+     telemetryGrid.boundsInParent.onChange( {
+       (_, o, n) => {
+         if (n.getMinX < 0.0) {
+           telemetryGrid.requestLayout()
+           println(telemetryGrid.boundsInParent.value)
+           val len = telemetryGrid.columnConstraints.length
+           if (len >= 1) {
+           telemetryGrid.columnConstraints = telemetryGrid.getColumnConstraints.drop(1).foldRight(List[ColumnConstraints]())(_ :: _)
+           var i = 0;
+           for (cell <- cells) {
+             GridPane.setRowIndex(cell, (i) / len)
+             GridPane.setColumnIndex(cell, (i) % len)
+             i += 1
+           }
+         }
+         }
+       }
+     })
+     
+     cells ::= gridCell
+    
+
+     GridPane.setRowIndex(gridCell, (a) / nColumns)
+     GridPane.setColumnIndex(gridCell, (a) % nColumns)
+
+    
+    telemetryGrid.children += gridCell
+    }
+    
+
+    telemetryGrid
+
+  }
+  
+  val theScene = new Scene {
+      fill = LightGreen
+      root = genSplit
+    }
 
   stage = new JFXApp.PrimaryStage {
     title.value = "Formica Sim"
     width = 600
     height = 450
-    scene = new Scene {
-      fill = LightGreen
-      root = genSplit
-    }
+    scene = theScene
   }
+  
 }
