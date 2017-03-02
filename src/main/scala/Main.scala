@@ -39,19 +39,18 @@ import scalafx.scene.layout.Region
 import scalafx.scene.control.Label
 import scalafx.beans.property.DoubleProperty
 import scalafx.scene.Group
-
-
+import scalafx.beans.property.IntegerProperty
+import scalafx.scene.control.ScrollPane
 
 object HelloStageDemo extends JFXApp {
-  
-  val power = new StringProperty(){
+
+  val power = new StringProperty() {
     value = "0"
   }
-  
-  val powerLabel = "Power/w"
-  
-  val telemetryProps = Array((powerLabel, power),(powerLabel, power),(powerLabel, power),(powerLabel, power),(powerLabel, power),(powerLabel, power));
 
+  val powerLabel = "Power/w"
+
+  val telemetryProps = Array((powerLabel, power), (powerLabel, power), (powerLabel, power), (powerLabel, power), (powerLabel, power), (powerLabel, power));
 
   def genSplit: Parent = {
 
@@ -61,7 +60,12 @@ object HelloStageDemo extends JFXApp {
       children = Seq(
         new Button {
           text = "on the right"
+        },
+        new Button {
+          text = "on the right"
+          margin = Insets(10)
         })
+
     }
 
     val split = new SplitPane {
@@ -69,116 +73,87 @@ object HelloStageDemo extends JFXApp {
       dividerPositions_=(0.80, 0.20)
       items ++= Seq(telemetryGrid, rightSide);
     }
-    
+
     split
   }
-  
 
-  def mkTelemetryGrid() = {
-    val telemetryGrid = new GridPane() {
-      padding = Insets(10)
-      style = "-fx-background-color: red"
-    }
-      
-    val columnConstraints = new ColumnConstraints() {
-        hgrow = Priority.Always;
-    }
-    
-    val nColumns = 3;
-    
-    for (a <- 1 to nColumns) {
-      telemetryGrid.columnConstraints += columnConstraints
-   }
-    
+  val columnN = new IntegerProperty() {
+    value = 3
+  }
 
-    var cells = List[Node]()
+  def mkTelemetryGrid(): Node = {
+
+    val telemetryGrid = new TilePane() {
+      prefColumns <== columnN
+    }
+
+    var cells = List[VBox]()
 
     for (a <- 0 until telemetryProps.length) {
 
-      
-     val label = new Label {
-            text = telemetryProps(a)._1
+      val label = new Label {
+        text = telemetryProps(a)._1
       }
-     
-     //label.setScaleX(10);
-     //label.setScaleY(10);
-     
-       
-     val value = new Text {
+
+      val value = new Text {
         text <== telemetryProps(a)._2
         style = "-fx-font-size: 200%"
       }
-     
-     val labelDataPair = new VBox() {
-       children = Seq(label, value)
-     }
-     
-     // group so that scaling children updates bounds
-     val g = new Group() {
-       children = Seq(labelDataPair)
-       hgrow = Priority.Always
-       vgrow = Priority.Always
-     }
-     
-     val gridCell = new VBox{
-         padding = Insets(10)
-         hgrow = Priority.Always
-         children = Seq(g)
-         alignment = Pos.Center
-     }
-     
-     
-     telemetryGrid.height.onChange( {
-       (_,_,newVal) => {
-         val size = newVal.doubleValue();
-         //vbox.setStyle("-fx-font-size:" + size)
-         power.value = size.toString()
-         val scale = size / 400 * 1.0;
-         for (x <- g.children) {
-           x.setScaleX(scale)
-           x.setScaleY(scale)
-         }
-       }
-     })
-     
-     telemetryGrid.boundsInParent.onChange( {
-       (_, o, n) => {
-         if (n.getMinX < 0.0) {
-           telemetryGrid.requestLayout()
-           println(telemetryGrid.boundsInParent.value)
-           val len = telemetryGrid.columnConstraints.length
-           if (len >= 1) {
-           telemetryGrid.columnConstraints = telemetryGrid.getColumnConstraints.drop(1).foldRight(List[ColumnConstraints]())(_ :: _)
-           var i = 0;
-           for (cell <- cells) {
-             GridPane.setRowIndex(cell, (i) / len)
-             GridPane.setColumnIndex(cell, (i) % len)
-             i += 1
-           }
-         }
-         }
-       }
-     })
-     
-     cells ::= gridCell
-    
 
-     GridPane.setRowIndex(gridCell, (a) / nColumns)
-     GridPane.setColumnIndex(gridCell, (a) % nColumns)
+      val labelDataPair = new VBox() {
+        children = Seq(label, value)
+      }
 
-    
-    telemetryGrid.children += gridCell
+      // group so that scaling children updates bounds
+      val g = new Group() {
+        children = Seq(labelDataPair)
+      }
+
+      val gridCell = new VBox {
+        margin = Insets(10)
+        children = Seq(g)
+        alignment = Pos.Center
+      }
+
+      cells = gridCell :: cells
+      telemetryGrid.children += gridCell
     }
-    
 
-    telemetryGrid
+    val scroll = new ScrollPane() {
+      content = telemetryGrid
+      fitToWidth = true
+      fitToHeight = true
+    }
+
+    scroll.height.onChange(
+      (_, oldVal, newVal) => {
+        val size = newVal.doubleValue();
+        power.value = size.toString()
+        val scale = size / 420 * 1.0;
+        for (x <- cells.flatMap(_.children)) {
+          x.setScaleX(scale)
+          x.setScaleY(scale)
+        }
+        // tile size is determined by largest prefWidth/Height
+        for (x <- cells) {
+          for (y <- x.children) {
+            val b = y.boundsInParent.value
+            x.setPrefSize(b.getWidth, b.getHeight)
+          }
+
+          x.margin = Insets(20 * scale)
+        }
+
+      })
+
+    scroll
 
   }
-  
+
   val theScene = new Scene {
-      fill = LightGreen
-      root = genSplit
-    }
+    fill = LightGreen
+    root = genSplit
+  }
 
   stage = new JFXApp.PrimaryStage {
     title.value = "Formica Sim"
@@ -186,5 +161,5 @@ object HelloStageDemo extends JFXApp {
     height = 450
     scene = theScene
   }
-  
+
 }
