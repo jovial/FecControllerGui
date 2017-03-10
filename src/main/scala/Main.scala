@@ -41,6 +41,11 @@ import scalafx.beans.property.DoubleProperty
 import scalafx.scene.Group
 import scalafx.beans.property.IntegerProperty
 import scalafx.scene.control.ScrollPane
+import scalafx.event.ActionEvent
+import scalafx.application.Platform
+import scalafx.scene.control.Dialog
+import scalafx.stage.StageStyle
+import scalafx.scene.control.ButtonType
 
 object HelloStageDemo extends JFXApp {
 
@@ -51,40 +56,109 @@ object HelloStageDemo extends JFXApp {
   val powerLabel = "Power/w"
 
   val telemetryProps = Array((powerLabel, power), (powerLabel, power), (powerLabel, power), (powerLabel, power), (powerLabel, power), (powerLabel, power));
+  
 
-  def genSplit: Parent = {
+  def genSplit: SplitPane = {
 
     val telemetryGrid = mkTelemetryGrid()
+    
+    val powerInput = mkInput(
+        StringProperty("Power"),
+        StringProperty("Set power (w)"),
+        validateNumber,
+        getInvalidNumTxt,
+        (v) => println(v)
+     )
+    
+     val hrInput = mkInput(
+        StringProperty("Heart rate"),
+        StringProperty("Set heart rate (bpm)"),
+        validateNumber,
+        getInvalidNumTxt,
+        (v) => println(v)
+     )   
+      
 
-    val rightSide = new GridPane {
-      children = Seq(
-        new Button {
-          text = "on the right"
-        },
-        new Button {
-          text = "on the right"
-          margin = Insets(10)
-        })
-
+    val rightSide = new TilePane {
+      margin = Insets(10)
+      prefColumns = 1
+      children = Seq(powerInput, hrInput)
     }
+    
+
 
     val split = new SplitPane {
       padding = Insets(20)
-      dividerPositions_=(0.80, 0.20)
-      items ++= Seq(telemetryGrid, rightSide);
+      dividerPositions_=(0.8)
+      items ++= Seq(telemetryGrid,rightSide);
     }
+    
+    SplitPane.setResizableWithParent(rightSide, false)
+    
 
     split
   }
 
-  val columnN = new IntegerProperty() {
-    value = 3
+  def mkInput(labelTxt: StringProperty, promptTxt: StringProperty, validate: (scalafx.scene.control.TextField) => Boolean,
+      getErrorTxt : (scalafx.scene.control.TextField) => String, onAccept: (String) => Unit) = {
+    val inputField = new TextField() {
+      promptText <== promptTxt
+    }
+    
+    // validate an integer
+    inputField.focused.onChange {((
+      
+      s, o, n) => if (!n && validate(inputField))
+          inputField.text = ""
+      )
+    }
+    
+    inputField.onAction = (ae: ActionEvent) => {
+        if (validate(inputField)) {
+          onAccept(inputField.text.value)
+          inputField.text = ""
+        } else {
+          val diag = new Dialog {
+            title = "Error"
+            contentText = getErrorTxt(inputField)
+          }
+          diag.initStyle(StageStyle.Utility)
+          diag.dialogPane.value.getButtonTypes.add(ButtonType.OK);
+          diag.showAndWait()
+        }
+      
+    }
+    
+    val inputLabel = new Label {
+      text <== labelTxt
+      labelFor = inputField
+    }
+    
+    val inputPair = new VBox {
+         // margin = Insets(10)
+          padding = Insets(5)
+          children = Seq(inputLabel, inputField)
+    }
+    inputPair
+  }
+
+  def getInvalidNumTxt(field: scalafx.scene.control.TextField) = {
+    field.text.value + " is invalid. You must enter a valid number"
+  }
+
+  def validateNumber(field: scalafx.scene.control.TextField) = {
+        // unfocused
+        if (!field.text.value.matches("[0-9]+")) {
+          false
+        } else {
+          true
+        }
   }
 
   def mkTelemetryGrid(): Node = {
 
     val telemetryGrid = new TilePane() {
-      prefColumns <== columnN
+      prefColumns =3
     }
 
     var cells = List[VBox]()
@@ -149,11 +223,14 @@ object HelloStageDemo extends JFXApp {
     scroll
 
   }
+  
+  val split = genSplit
 
   val theScene = new Scene {
     fill = LightGreen
-    root = genSplit
+    root = split
   }
+  
 
   stage = new JFXApp.PrimaryStage {
     title.value = "Formica Sim"
@@ -161,5 +238,4 @@ object HelloStageDemo extends JFXApp {
     height = 450
     scene = theScene
   }
-
 }
