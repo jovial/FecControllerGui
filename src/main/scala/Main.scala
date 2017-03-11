@@ -56,12 +56,6 @@ import scalafx.beans.property.ReadOnlyObjectProperty
 import scalafx.geometry.Bounds
 
 
-class TransformGroup extends Group {
-  val originalBounds = super.boundsInLocal
-  override def boundsInLocal: ReadOnlyObjectProperty[javafx.geometry.Bounds] = boundsInParent
-}
-
-
 object HelloStageDemo extends JFXApp {
 
   val power = new StringProperty() {
@@ -183,11 +177,13 @@ object HelloStageDemo extends JFXApp {
 
   def mkTelemetryGrid(): Node = {
 
-    val telemetryGrid = new TilePane() {
-      prefColumns = 3
+    val telemetryGrid = new TilePane
+    
+    var cells = List[Node]()
+    
+    val theWidth = new DoubleProperty {
+      value = 1
     }
-
-    var cells = List[VBox]()
 
     for (a <- 0 until telemetryProps.length) {
 
@@ -201,6 +197,7 @@ object HelloStageDemo extends JFXApp {
       }
 
       val labelDataPair = new VBox() {
+        padding = Insets(10)
         children = Seq(label, value)
       }
 
@@ -209,11 +206,18 @@ object HelloStageDemo extends JFXApp {
         children = Seq(labelDataPair)
       }
       
-
-      val gridCell = new VBox {
-        margin = Insets(10)
-        children = Seq(g)
-        alignment = Pos.Center
+        g.boundsInLocal.onChange {
+        (_, o, n) =>
+          {
+            val a = n.getWidth
+            g.scaleX <== { theWidth / ((a) / 0.98) }
+            g.scaleY <== { theWidth / ((a) / 0.98) }
+          }
+      }
+      
+      // second group to take into account scaled bounds
+      val gridCell = new Group {
+        children = g
       }
 
       cells = gridCell :: cells
@@ -224,10 +228,6 @@ object HelloStageDemo extends JFXApp {
       content = telemetryGrid
       fitToWidth = true
       fitToHeight = true
-    }
-
-    val theWidth = new DoubleProperty {
-      value = 1
     }
 
     scroll.width.onChange {
@@ -243,37 +243,11 @@ object HelloStageDemo extends JFXApp {
             cols = 2
           }
 
-          val actual = (size - 0.06 * size * cols) / cols
+          val actual = (size) / cols
 
           theWidth.value = actual
 
-          // should probably dynamically scale this
-          for (x <- cells) {
-            x.margin = Insets(0.03 * size)
-          }
-
         }
-    }
-    for (x <- cells.flatMap(_.children)) {
-      x.boundsInLocal.onChange {
-        (_, o, n) =>
-          {
-            val a = n.getWidth
-            x.scaleX <== { theWidth / (a / 0.98) }
-            x.scaleY <== { theWidth / (a / 0.98) }
-          }
-      }
-
-    }
-
-    for (x <- cells) {
-      for (y <- x.children) {
-
-        y.boundsInParent.onChange {
-          (_, o, n) => x.setPrefSize(n.getWidth, n.getHeight)
-        }
-      }
-
     }
 
     scroll.height.onChange(
