@@ -50,6 +50,17 @@ import scalafx.beans.property.ReadOnlyProperty
 import scalafx.scene.paint.Color
 import scalafx.scene.text.TextAlignment
 import scalafx.beans.property.BooleanProperty
+import scalafx.scene.control.Alert
+import scalafx.scene.control.Alert.AlertType
+import scalafx.beans.property.ReadOnlyObjectProperty
+import scalafx.geometry.Bounds
+
+
+class TransformGroup extends Group {
+  val originalBounds = super.boundsInLocal
+  override def boundsInLocal: ReadOnlyObjectProperty[javafx.geometry.Bounds] = boundsInParent
+}
+
 
 object HelloStageDemo extends JFXApp {
 
@@ -142,13 +153,11 @@ object HelloStageDemo extends JFXApp {
         onAccept(inputField.text.value)
         inputField.text = ""
       } else {
-        val diag = new Dialog {
+
+        new Alert(AlertType.Error) {
           title = "Error"
           contentText = getErrorTxt(inputField)
-        }
-        diag.initStyle(StageStyle.Utility)
-        diag.dialogPane.value.getButtonTypes.add(ButtonType.OK);
-        diag.showAndWait()
+        }.showAndWait()
       }
 
     }
@@ -159,7 +168,7 @@ object HelloStageDemo extends JFXApp {
     }
 
     val inputPair = new VBox {
-      // margin = Insets(10)
+      //margin = Insets(10)
       padding = Insets(5)
       children = Seq(inputLabel, inputField)
     }
@@ -199,6 +208,7 @@ object HelloStageDemo extends JFXApp {
       val g = new Group() {
         children = Seq(labelDataPair)
       }
+      
 
       val gridCell = new VBox {
         margin = Insets(10)
@@ -215,12 +225,11 @@ object HelloStageDemo extends JFXApp {
       fitToWidth = true
       fitToHeight = true
     }
-    
-    
+
     val theWidth = new DoubleProperty {
       value = 1
     }
-    
+
     scroll.width.onChange {
       (_, old, newV) =>
         {
@@ -233,61 +242,44 @@ object HelloStageDemo extends JFXApp {
           } else if (size >= 200) {
             cols = 2
           }
-           
-          
-        val actual = (size - 0.06 * size * cols) / cols
-        
-        theWidth.value = actual
-        
-        // should probably dynamically scale this
-        for (x <- cells) {
-          x.margin = Insets(0.03 * size)
-        }
+
+          val actual = (size - 0.06 * size * cols) / cols
+
+          theWidth.value = actual
+
+          // should probably dynamically scale this
+          for (x <- cells) {
+            x.margin = Insets(0.03 * size)
+          }
 
         }
     }
-        for (x <- cells.flatMap(_.children)) {
-          x.boundsInLocal.onChange {
-            (_,o,n) => {
-              val a = n.getWidth
-              x.scaleX <== {theWidth / (a / 0.98)}
-              x.scaleY <== {theWidth / (a / 0.98)}
-            }
+    for (x <- cells.flatMap(_.children)) {
+      x.boundsInLocal.onChange {
+        (_, o, n) =>
+          {
+            val a = n.getWidth
+            x.scaleX <== { theWidth / (a / 0.98) }
+            x.scaleY <== { theWidth / (a / 0.98) }
           }
-          
-        }     
-    
+      }
 
-          for (x <- cells) {
-            for (y <- x.children) {
-     
-              y.boundsInParent.onChange {
-                (_,o,n) => x.setPrefSize(n.getWidth, n.getHeight)
-              }
-            }
+    }
 
-          }    
-    
-    
+    for (x <- cells) {
+      for (y <- x.children) {
+
+        y.boundsInParent.onChange {
+          (_, o, n) => x.setPrefSize(n.getWidth, n.getHeight)
+        }
+      }
+
+    }
+
     scroll.height.onChange(
       (_, oldVal, newVal) => {
         val size = newVal.doubleValue();
         power.value = size.toString()
-        val scale = size / 420 * 1.0;
-        val actual = Math.max(scale, 1.0)
-        for (x <- cells.flatMap(_.children)) {
-          //x.setScaleX(actual)
-          //x.setScaleY(actual)
-        }
-        // tile size is determined by largest prefWidth/Height
-        for (x <- cells) {
-          for (y <- x.children) {
-            val b = y.boundsInParent.value
-            //x.setPrefSize(b.getWidth, b.getHeight)
-          }
-
-          //x.margin = Insets(20 * actual)
-        }
 
       })
 
