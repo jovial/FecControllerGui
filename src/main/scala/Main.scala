@@ -61,10 +61,38 @@ object HelloStageDemo extends JFXApp {
   val power = new StringProperty() {
     value = "0"
   }
+  
+  val speed = new StringProperty() {
+    value = "10"
+  }
+  
+  val hr = new StringProperty() {
+    value = "75"
+  }
+  
+  val cadence = new StringProperty() {
+    value = "75"
+  }
+  
+  val distance = new StringProperty() {
+    value = "0.00"
+  }
+  
+  val gearRatio = new StringProperty() {
+    value = "4.00"
+  }
+  
 
   val powerLabel = "Power/w"
+  val speedLabel = "Speed/kmh"
+  val heartRateLabel = "Heart rate/bpm"
+  val cadenceLabel = "Cadence/rpm"
+  val distanceLabel = "Distance/km"
+  val gearRatioLabel = "Gear ratio"
+  
 
-  val telemetryProps = Array((powerLabel, power), (powerLabel, power), (powerLabel, power), (powerLabel, power), (powerLabel, power), (powerLabel, power));
+  val telemetryProps = Array((powerLabel, power), (speedLabel, speed), (heartRateLabel, hr),
+      (cadenceLabel, cadence), (distanceLabel, distance), (gearRatioLabel, gearRatio));
 
   def genSplit: Parent = {
 
