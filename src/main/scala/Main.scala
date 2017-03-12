@@ -55,33 +55,31 @@ import scalafx.scene.control.Alert.AlertType
 import scalafx.beans.property.ReadOnlyObjectProperty
 import scalafx.geometry.Bounds
 
-
 object HelloStageDemo extends JFXApp {
 
   val power = new StringProperty() {
     value = "0"
   }
-  
+
   val speed = new StringProperty() {
     value = "10"
   }
-  
+
   val hr = new StringProperty() {
     value = "75"
   }
-  
+
   val cadence = new StringProperty() {
     value = "75"
   }
-  
+
   val distance = new StringProperty() {
     value = "0.00"
   }
-  
+
   val gearRatio = new StringProperty() {
     value = "4.00"
   }
-  
 
   val powerLabel = "Power/w"
   val speedLabel = "Speed/kmh"
@@ -89,10 +87,9 @@ object HelloStageDemo extends JFXApp {
   val cadenceLabel = "Cadence/rpm"
   val distanceLabel = "Distance/km"
   val gearRatioLabel = "Gear ratio"
-  
 
   val telemetryProps = Array((powerLabel, power), (speedLabel, speed), (heartRateLabel, hr),
-      (cadenceLabel, cadence), (distanceLabel, distance), (gearRatioLabel, gearRatio));
+    (cadenceLabel, cadence), (distanceLabel, distance), (gearRatioLabel, gearRatio));
 
   def genSplit: Parent = {
 
@@ -111,7 +108,6 @@ object HelloStageDemo extends JFXApp {
       validateNumber,
       getInvalidNumTxt,
       (v) => println(v))
-        
 
     val rightSide = new TilePane {
       margin = Insets(10)
@@ -211,17 +207,16 @@ object HelloStageDemo extends JFXApp {
       padding = Insets(20)
       hgap = 10
     }
-    
-    
+
     var cells = List[Node]()
-    
+
     val theWidth = new DoubleProperty {
       value = 1
     }
-    
+
     var maxLength = 0;
-    var maxPair : VBox = null
-    
+    var maxPair: VBox = null
+
     val scaleFactor = new DoubleProperty
 
     for (a <- 0 until telemetryProps.length) {
@@ -237,14 +232,15 @@ object HelloStageDemo extends JFXApp {
 
       val labelDataPair = new VBox() {
         children = Seq(label, value)
+        padding = Insets(20)
       }
-      
+
       if (label.text.length.get > maxLength) {
         maxLength = label.text.length.get
         maxPair = labelDataPair
       }
-      
-        labelDataPair.boundsInLocal.onChange {
+
+      labelDataPair.boundsInLocal.onChange {
         (_, o, n) =>
           {
             val a = n.getWidth
@@ -252,7 +248,7 @@ object HelloStageDemo extends JFXApp {
             labelDataPair.scaleY <== scaleFactor
           }
       }
-      
+
       // second group to take into account scaled bounds
       val gridCell = new Group {
         children = labelDataPair
@@ -261,14 +257,14 @@ object HelloStageDemo extends JFXApp {
       cells = gridCell :: cells
       telemetryGrid.children += gridCell
     }
-    
-      maxPair.boundsInLocal.onChange {
-        (_, o, n) =>
-          {
-            val a = n.getWidth
-            scaleFactor <== theWidth / (a / 0.98)
-          }
-      }
+
+    maxPair.boundsInLocal.onChange {
+      (_, o, n) =>
+        {
+          val a = n.getWidth
+          scaleFactor <== theWidth / (a / 0.98)
+        }
+    }
 
     val scroll = new ScrollPane() {
       content = telemetryGrid
