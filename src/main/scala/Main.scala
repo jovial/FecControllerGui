@@ -206,13 +206,23 @@ object HelloStageDemo extends JFXApp {
 
   def mkTelemetryGrid(): Node = {
 
-    val telemetryGrid = new TilePane
+    val telemetryGrid = new TilePane {
+      tileAlignment = Pos.CenterLeft
+      padding = Insets(20)
+      hgap = 10
+    }
+    
     
     var cells = List[Node]()
     
     val theWidth = new DoubleProperty {
       value = 1
     }
+    
+    var maxLength = 0;
+    var maxPair : VBox = null
+    
+    val scaleFactor = new DoubleProperty
 
     for (a <- 0 until telemetryProps.length) {
 
@@ -226,16 +236,20 @@ object HelloStageDemo extends JFXApp {
       }
 
       val labelDataPair = new VBox() {
-        padding = Insets(10)
         children = Seq(label, value)
+      }
+      
+      if (label.text.length.get > maxLength) {
+        maxLength = label.text.length.get
+        maxPair = labelDataPair
       }
       
         labelDataPair.boundsInLocal.onChange {
         (_, o, n) =>
           {
             val a = n.getWidth
-            labelDataPair.scaleX <== { theWidth / ((a) / 0.98) }
-            labelDataPair.scaleY <== { theWidth / ((a) / 0.98) }
+            labelDataPair.scaleX <== scaleFactor
+            labelDataPair.scaleY <== scaleFactor
           }
       }
       
@@ -247,6 +261,14 @@ object HelloStageDemo extends JFXApp {
       cells = gridCell :: cells
       telemetryGrid.children += gridCell
     }
+    
+      maxPair.boundsInLocal.onChange {
+        (_, o, n) =>
+          {
+            val a = n.getWidth
+            scaleFactor <== theWidth / (a / 0.98)
+          }
+      }
 
     val scroll = new ScrollPane() {
       content = telemetryGrid
@@ -267,7 +289,7 @@ object HelloStageDemo extends JFXApp {
             cols = 2
           }
 
-          val actual = (size) / cols
+          val actual = (size - 40 - 10 * cols) / cols
 
           theWidth.value = actual
 
