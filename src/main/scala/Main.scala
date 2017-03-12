@@ -83,6 +83,7 @@ object HelloStageDemo extends JFXApp {
       validateNumber,
       getInvalidNumTxt,
       (v) => println(v))
+        
 
     val rightSide = new TilePane {
       margin = Insets(10)
@@ -200,24 +201,19 @@ object HelloStageDemo extends JFXApp {
         padding = Insets(10)
         children = Seq(label, value)
       }
-
-      // group so that scaling children updates bounds
-      val g = new Group() {
-        children = Seq(labelDataPair)
-      }
       
-        g.boundsInLocal.onChange {
+        labelDataPair.boundsInLocal.onChange {
         (_, o, n) =>
           {
             val a = n.getWidth
-            g.scaleX <== { theWidth / ((a) / 0.98) }
-            g.scaleY <== { theWidth / ((a) / 0.98) }
+            labelDataPair.scaleX <== { theWidth / ((a) / 0.98) }
+            labelDataPair.scaleY <== { theWidth / ((a) / 0.98) }
           }
       }
       
       // second group to take into account scaled bounds
       val gridCell = new Group {
-        children = g
+        children = labelDataPair
       }
 
       cells = gridCell :: cells
