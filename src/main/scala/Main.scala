@@ -59,15 +59,16 @@ import javafx.event.EventHandler
 import javafx.stage.WindowEvent
 import java.util.Timer
 import java.util.TimerTask
-
+import scalafx.beans.property.ObjectProperty
+import scalafx.event.subscriptions.Subscription
 
 object HelloStageDemo extends JFXApp {
-  
+
   val turbo = new DummyFecTurbo();
   val antInterface = new AntTransceiver(0);
   val antNode = new org.cowboycoders.ant.Node(antInterface);
   val turboModel = turbo.getState
-    
+
   val turboThread = new Thread() {
     override def run() = {
       println("Node starting")
@@ -75,36 +76,36 @@ object HelloStageDemo extends JFXApp {
       antNode.reset()
       turbo.start(antNode)
     }
-  }  
+  }
   turboThread.start()
-  
+
   val timer = new Timer()
-  
+
   timer.scheduleAtFixedRate(new TimerTask() {
-    override def run =  {
+    override def run = {
       Platform.runLater {
-        () => {
-      power.value = turboModel.getPower.toString()
-      // we are doing conversion from m/s to km/h but we might use km/h internally later
-      speed.value = "%2.2f".format(turboModel.getSpeed.doubleValue() * 3.6)
-      hr.value = turboModel.getHeartRate.toString()
-      cadence.value = turboModel.getCadence.toString
-      distance.value = "%2.2f".format((turboModel.getDistance / 1000.0))
-      gearRatio.value = "%2.2f".format(turboModel.getGearRatio)
-      bikeWeight.value = "%2.2f".format(turboModel.getBikeWeight)
-      val athlete = turboModel.getAthlete
-      userWeight.value = "%2.2f".format(athlete.getWeight)
-      userHeight.value = "%2.0f".format(athlete.getHeight)
-      userAge.value = "%d".format(athlete.getAge)
-      wheelDiameter.value = "%2.2f".format(turboModel.getWheelDiameter)
-      gradient.value = "%2.0f".format(turboModel.getTrackResistance.getGradient)
-      coeffRolling.value = "%2.0f".format(turboModel.getTrackResistance.getCoefficientRollingResistance)
+        () =>
+          {
+            power.value = turboModel.getPower.toString()
+            // we are doing conversion from m/s to km/h but we might use km/h internally later
+            speed.value = "%2.2f".format(turboModel.getSpeed.doubleValue() * 3.6)
+            hr.value = turboModel.getHeartRate.toString()
+            cadence.value = turboModel.getCadence.toString
+            distance.value = "%2.2f".format((turboModel.getDistance / 1000.0))
+            gearRatio.value = "%2.2f".format(turboModel.getGearRatio)
+            bikeWeight.value = "%2.2f".format(turboModel.getBikeWeight)
+            val athlete = turboModel.getAthlete
+            userWeight.value = "%2.2f".format(athlete.getWeight)
+            userHeight.value = "%2.0f".format(athlete.getHeight)
+            userAge.value = "%d".format(athlete.getAge)
+            wheelDiameter.value = "%2.2f".format(turboModel.getWheelDiameter)
+            gradient.value = "%2.0f".format(turboModel.getTrackResistance.getGradient)
+            coeffRolling.value = "%2.0f".format(turboModel.getTrackResistance.getCoefficientRollingResistance)
+          }
+
       }
-      
-    }
     }
   }, 200, 500)
-  
 
   val power = new StringProperty() {
     value = "0"
@@ -129,16 +130,15 @@ object HelloStageDemo extends JFXApp {
   val gearRatio = new StringProperty() {
     value = "4.00"
   }
-  
+
   val gradient = new StringProperty
   val coeffRolling = new StringProperty
-  
+
   val bikeWeight = new StringProperty
   val userWeight = new StringProperty
   val userAge = new StringProperty
   val userHeight = new StringProperty
   val wheelDiameter = new StringProperty
-  
 
   val powerLabel = "Power/w"
   val speedLabel = "Speed/kmh"
@@ -152,17 +152,13 @@ object HelloStageDemo extends JFXApp {
   val userHeightLabel = "User height/cm"
   val wheelDiaLabel = "Wheel diameter/m"
   val coeffRollingLabel = "Coeff. rolling r."
-  val gradientLabel = "gradient/%"
-  
-  
+  val gradientLabel = "Gradient/%"
 
   val telemetryProps = Array((powerLabel, power), (speedLabel, speed), (heartRateLabel, hr),
     (cadenceLabel, cadence), (distanceLabel, distance), (gearRatioLabel, gearRatio),
     (bikeWeightLabel, bikeWeight), (userWeightLabel, userWeight), (userAgeLabel, userAge),
     (userHeightLabel, userHeight), (wheelDiaLabel, wheelDiameter), (coeffRollingLabel, coeffRolling),
     (gradientLabel, gradient))
-    
-    
 
   def genSplit: Parent = {
 
@@ -281,16 +277,15 @@ object HelloStageDemo extends JFXApp {
       hgap = 10
     }
 
-    var cells = List[Node]()
+    var cells = List[VBox]()
 
     val theWidth = new DoubleProperty {
       value = 1
     }
 
-    var maxLength = 0;
-    var maxPair: VBox = null
-
-    val scaleFactor = new DoubleProperty
+    val scaleFactor = new DoubleProperty {
+      value = 1
+    }
 
     for (a <- 0 until telemetryProps.length) {
 
@@ -307,12 +302,6 @@ object HelloStageDemo extends JFXApp {
         children = Seq(label, value)
         padding = Insets(20)
       }
-      
-      //FIXME: extremely fragile
-      if (label.text.length.get > maxLength) {
-        maxLength = label.text.length.get
-        maxPair = labelDataPair
-      }
 
       labelDataPair.boundsInLocal.onChange {
         (_, o, n) =>
@@ -328,15 +317,45 @@ object HelloStageDemo extends JFXApp {
         children = labelDataPair
       }
 
-      cells = gridCell :: cells
+      cells = labelDataPair :: cells
       telemetryGrid.children += gridCell
     }
 
-    maxPair.boundsInLocal.onChange {
-      (_, o, n) =>
+    val test = new ObjectProperty[VBox]()
+
+    var sub: Subscription = null
+
+    test.onChange {
+      (a, b, c) =>
         {
-          val a = n.getWidth
-          scaleFactor <== theWidth / (a / 0.90)
+          if (sub != null) sub.cancel()
+          sub = c.boundsInLocal.onChange {
+            (_, o, n) =>
+              {
+                val a = n.getWidth
+                scaleFactor <== theWidth / (a / 0.90)
+              }
+          }
+        }
+    }
+
+    // run this later so that bounds are calculated
+    Platform.runLater {
+      () =>
+        {
+          var maxLength = 0.0;
+          var maxPair: VBox = null
+          for (cell <- cells) {
+            val len = cell.layoutBoundsProperty().get.getWidth
+            if (len > maxLength) {
+              maxLength = len
+              maxPair = cell
+            }
+          }
+          val a = maxPair.getWidth
+          scaleFactor <== theWidth / (a / 0.98)
+          test.value = maxPair
+
         }
     }
 
@@ -383,15 +402,15 @@ object HelloStageDemo extends JFXApp {
     height = 450
     scene = theScene
   }
-  
+
   // kill the background thread
   stage.onCloseRequest = new EventHandler[WindowEvent] {
-    
+
     override def handle(e: WindowEvent): Unit = {
-        Platform.exit();
-        antNode.stop()
-        System.exit(0);
+      Platform.exit();
+      antNode.stop()
+      System.exit(0);
     }
-    
+
   }
 }
