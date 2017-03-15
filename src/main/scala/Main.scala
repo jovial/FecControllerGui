@@ -61,6 +61,11 @@ import java.util.Timer
 import java.util.TimerTask
 import scalafx.beans.property.ObjectProperty
 import scalafx.event.subscriptions.Subscription
+import javafx.beans.value.ObservableNumberValue
+import javafx.beans.binding.DoubleBinding
+import scalafx.beans.binding.Bindings
+import scalafx.beans.binding.ObjectBinding
+import scalafx.beans.value.ObservableValue
 
 object HelloStageDemo extends JFXApp {
 
@@ -139,6 +144,7 @@ object HelloStageDemo extends JFXApp {
   val userAge = new StringProperty
   val userHeight = new StringProperty
   val wheelDiameter = new StringProperty
+  val windSpeed = new StringProperty
 
   val powerLabel = "Power/w"
   val speedLabel = "Speed/kmh"
@@ -153,12 +159,14 @@ object HelloStageDemo extends JFXApp {
   val wheelDiaLabel = "Wheel diameter/m"
   val coeffRollingLabel = "Coeff. rolling r."
   val gradientLabel = "Gradient/%"
+  
+  val windSpeedLabel = "Wind speed/m/s"
 
   val telemetryProps = Array((powerLabel, power), (speedLabel, speed), (heartRateLabel, hr),
     (cadenceLabel, cadence), (distanceLabel, distance), (gearRatioLabel, gearRatio),
     (bikeWeightLabel, bikeWeight), (userWeightLabel, userWeight), (userAgeLabel, userAge),
     (userHeightLabel, userHeight), (wheelDiaLabel, wheelDiameter), (coeffRollingLabel, coeffRolling),
-    (gradientLabel, gradient))
+    (gradientLabel, gradient), (windSpeedLabel, windSpeed))
 
   def genSplit: Parent = {
 
@@ -177,11 +185,21 @@ object HelloStageDemo extends JFXApp {
       validateNumber,
       getInvalidNumTxt,
       (v) => turbo.setHeartrate(Integer.parseUnsignedInt(v)))
+      
+    val button = new Button {
+      text = "press me"
+      onAction = { (e: ActionEvent) => windSpeed.value = "why such a long string?"}
+    }
+    
+    val button2 = new Button {
+      text = "press me"
+      onAction = { (e: ActionEvent) => windSpeed.value = ""}
+    }
 
     val rightSide = new TilePane {
       margin = Insets(10)
       prefColumns = 1
-      children = Seq(powerInput, hrInput)
+      children = Seq(powerInput, hrInput, button, button2)
     }
 
     val split = new SplitPane {
@@ -321,23 +339,6 @@ object HelloStageDemo extends JFXApp {
       telemetryGrid.children += gridCell
     }
 
-    val test = new ObjectProperty[VBox]()
-
-    var sub: Subscription = null
-
-    test.onChange {
-      (a, b, c) =>
-        {
-          if (sub != null) sub.cancel()
-          sub = c.boundsInLocal.onChange {
-            (_, o, n) =>
-              {
-                val a = n.getWidth
-                scaleFactor <== theWidth / (a / 0.90)
-              }
-          }
-        }
-    }
 
     // run this later so that bounds are calculated
     Platform.runLater {
@@ -352,9 +353,34 @@ object HelloStageDemo extends JFXApp {
               maxPair = cell
             }
           }
+
+          def helper(a:  ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds], b: ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds]): ObjectBinding[javafx.geometry.Bounds] = {
+            Bindings.createObjectBinding(() => {
+              (Option(a.value), Option(b.value)) match {
+                case (Some(a), Some(b)) => if (a.getWidth > b.getWidth) a else b
+                case (_, Some(b)) => b
+                case (Some(a), _) => a
+                case _ => throw new RuntimeException()
+              }
+          
+            },
+            Array(a,b): _*)
+          }
+          
+          val ty = new ObjectProperty[javafx.geometry.Bounds]() {
+          }
+          val largest = cells.map(_.boundsInLocal).foldLeft(ty.asInstanceOf[ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds]])((a,b) => helper(a,b))
+
+          largest.onChange {
+            (_,a,b) => {
+              scaleFactor.unbind() // unsure if this is necessary
+              scaleFactor <== theWidth / (b.getWidth / 0.98)
+            }
+          }
+          
+          
           val a = maxPair.getWidth
           scaleFactor <== theWidth / (a / 0.98)
-          test.value = maxPair
 
         }
     }
