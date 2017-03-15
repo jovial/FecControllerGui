@@ -159,7 +159,7 @@ object HelloStageDemo extends JFXApp {
   val wheelDiaLabel = "Wheel diameter/m"
   val coeffRollingLabel = "Coeff. rolling r."
   val gradientLabel = "Gradient/%"
-  
+
   val windSpeedLabel = "Wind speed/m/s"
 
   val telemetryProps = Array((powerLabel, power), (speedLabel, speed), (heartRateLabel, hr),
@@ -185,15 +185,15 @@ object HelloStageDemo extends JFXApp {
       validateNumber,
       getInvalidNumTxt,
       (v) => turbo.setHeartrate(Integer.parseUnsignedInt(v)))
-      
+
     val button = new Button {
       text = "press me"
-      onAction = { (e: ActionEvent) => windSpeed.value = "why such a long string?"}
+      onAction = { (e: ActionEvent) => windSpeed.value = "why such a long string?" }
     }
-    
+
     val button2 = new Button {
       text = "press me"
-      onAction = { (e: ActionEvent) => windSpeed.value = ""}
+      onAction = { (e: ActionEvent) => windSpeed.value = "" }
     }
 
     val rightSide = new TilePane {
@@ -339,49 +339,28 @@ object HelloStageDemo extends JFXApp {
       telemetryGrid.children += gridCell
     }
 
+    def helper(a: ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds], b: ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds]): ObjectBinding[javafx.geometry.Bounds] = {
+      Bindings.createObjectBinding(() => {
+        (Option(a.value), Option(b.value)) match {
+          case (Some(a), Some(b)) => if (a.getWidth > b.getWidth) a else b
+          case (_, Some(b))       => b
+          case (Some(a), _)       => a
+          case _                  => throw new RuntimeException()
+        }
 
-    // run this later so that bounds are calculated
-    Platform.runLater {
-      () =>
+      },
+        Array(a, b): _*)
+    }
+
+    val ty = new ObjectProperty[javafx.geometry.Bounds]() {
+    }
+    val largest = cells.map(_.boundsInLocal).foldLeft(ty.asInstanceOf[ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds]])((a, b) => helper(a, b))
+
+    largest.onChange {
+      (_, a, b) =>
         {
-          var maxLength = 0.0;
-          var maxPair: VBox = null
-          for (cell <- cells) {
-            val len = cell.layoutBoundsProperty().get.getWidth
-            if (len > maxLength) {
-              maxLength = len
-              maxPair = cell
-            }
-          }
-
-          def helper(a:  ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds], b: ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds]): ObjectBinding[javafx.geometry.Bounds] = {
-            Bindings.createObjectBinding(() => {
-              (Option(a.value), Option(b.value)) match {
-                case (Some(a), Some(b)) => if (a.getWidth > b.getWidth) a else b
-                case (_, Some(b)) => b
-                case (Some(a), _) => a
-                case _ => throw new RuntimeException()
-              }
-          
-            },
-            Array(a,b): _*)
-          }
-          
-          val ty = new ObjectProperty[javafx.geometry.Bounds]() {
-          }
-          val largest = cells.map(_.boundsInLocal).foldLeft(ty.asInstanceOf[ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds]])((a,b) => helper(a,b))
-
-          largest.onChange {
-            (_,a,b) => {
-              scaleFactor.unbind() // unsure if this is necessary
-              scaleFactor <== theWidth / (b.getWidth / 0.98)
-            }
-          }
-          
-          
-          val a = maxPair.getWidth
-          scaleFactor <== theWidth / (a / 0.98)
-
+          scaleFactor.unbind() // unsure if this is necessary
+          scaleFactor <== theWidth / (b.getWidth / 0.98)
         }
     }
 
