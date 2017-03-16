@@ -188,7 +188,10 @@ object HelloStageDemo extends JFXApp {
 
     val button = new Button {
       text = "press me"
-      onAction = { (e: ActionEvent) => windSpeed.value = "why such a long string?" }
+      onAction = { (e: ActionEvent) => {
+        windSpeed.value = "why such a long string?" 
+      }
+      }
     }
 
     val button2 = new Button {
@@ -287,6 +290,8 @@ object HelloStageDemo extends JFXApp {
 
   def validateNumber(field: scalafx.scene.control.TextField) = field.text.value.matches("[0-9]+")
 
+  var largest: ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds] = null;
+  
   def mkTelemetryGrid(): Node = {
 
     val telemetryGrid = new TilePane {
@@ -349,17 +354,17 @@ object HelloStageDemo extends JFXApp {
         }
 
       },
-        Array(a, b): _*)
+        a, b)
     }
 
     val ty = new ObjectProperty[javafx.geometry.Bounds]() {
     }
-    val largest = cells.map(_.boundsInLocal).foldLeft(ty.asInstanceOf[ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds]])((a, b) => helper(a, b))
+    largest = cells.map(_.boundsInLocal).foldLeft(ty.asInstanceOf[ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds]])((a, b) => helper(a, b))
 
     largest.onChange {
       (_, a, b) =>
         {
-          scaleFactor.unbind() // unsure if this is necessary
+          //scaleFactor.unbind() // unsure if this is necessary
           scaleFactor <== theWidth / (b.getWidth / 0.98)
         }
     }
