@@ -66,6 +66,11 @@ import javafx.beans.binding.DoubleBinding
 import scalafx.beans.binding.Bindings
 import scalafx.beans.binding.ObjectBinding
 import scalafx.beans.value.ObservableValue
+import scalafx.collections.transformation.FilteredBuffer
+import java.util.function.Predicate
+
+case class Cell(label: StringProperty, value: StringProperty)
+case class GridCellGroup(predicate: () => Boolean, enabled: Option[BooleanProperty], cells: Array[Cell])
 
 object HelloStageDemo extends JFXApp {
 
@@ -85,32 +90,6 @@ object HelloStageDemo extends JFXApp {
   turboThread.start()
 
   val timer = new Timer()
-
-  timer.scheduleAtFixedRate(new TimerTask() {
-    override def run = {
-      Platform.runLater {
-        () =>
-          {
-            power.value = turboModel.getPower.toString()
-            // we are doing conversion from m/s to km/h but we might use km/h internally later
-            speed.value = "%2.2f".format(turboModel.getSpeed.doubleValue() * 3.6)
-            hr.value = turboModel.getHeartRate.toString()
-            cadence.value = turboModel.getCadence.toString
-            distance.value = "%2.2f".format((turboModel.getDistance / 1000.0))
-            gearRatio.value = "%2.2f".format(turboModel.getGearRatio)
-            bikeWeight.value = "%2.2f".format(turboModel.getBikeWeight)
-            val athlete = turboModel.getAthlete
-            userWeight.value = "%2.2f".format(athlete.getWeight)
-            userHeight.value = "%2.0f".format(athlete.getHeight)
-            userAge.value = "%d".format(athlete.getAge)
-            wheelDiameter.value = "%2.2f".format(turboModel.getWheelDiameter)
-            gradient.value = "%2.0f".format(turboModel.getTrackResistance.getGradient)
-            coeffRolling.value = "%2.0f".format(turboModel.getTrackResistance.getCoefficientRollingResistance)
-          }
-
-      }
-    }
-  }, 200, 500)
 
   val power = new StringProperty() {
     value = "0"
@@ -145,6 +124,8 @@ object HelloStageDemo extends JFXApp {
   val userHeight = new StringProperty
   val wheelDiameter = new StringProperty
   val windSpeed = new StringProperty
+  val windCoeff = new StringProperty
+  val draftingFactor = new StringProperty
 
   val powerLabel = "Power/w"
   val speedLabel = "Speed/kmh"
@@ -161,12 +142,46 @@ object HelloStageDemo extends JFXApp {
   val gradientLabel = "Gradient/%"
 
   val windSpeedLabel = "Wind speed/m/s"
+  val windCoeffLabel = "Wind coeff."
+  val draftingFactorLabel = "Drafting factor"
+
+  timer.scheduleAtFixedRate(new TimerTask() {
+    override def run = {
+      Platform.runLater {
+        () =>
+          {
+            power.value = turboModel.getPower.toString()
+            // we are doing conversion from m/s to km/h but we might use km/h internally later
+            speed.value = "%2.2f".format(turboModel.getSpeed.doubleValue() * 3.6)
+            hr.value = turboModel.getHeartRate.toString()
+            cadence.value = turboModel.getCadence.toString
+            distance.value = "%2.2f".format((turboModel.getDistance / 1000.0))
+            gearRatio.value = "%2.2f".format(turboModel.getGearRatio)
+            bikeWeight.value = "%2.2f".format(turboModel.getBikeWeight)
+            val athlete = turboModel.getAthlete
+            userWeight.value = "%2.2f".format(athlete.getWeight)
+            userHeight.value = "%2.0f".format(athlete.getHeight)
+            userAge.value = "%d".format(athlete.getAge)
+            wheelDiameter.value = "%2.2f".format(turboModel.getWheelDiameter)
+            gradient.value = "%2.2f".format(turboModel.getTrackResistance.getGradient)
+            coeffRolling.value = "%2.2f".format(turboModel.getTrackResistance.getCoefficientRollingResistance)
+            val windResistance = turboModel.getWindResistance
+            windSpeed.value = "%d".format(windResistance.getWindSpeed)
+            draftingFactor.value = "%2.2f".format(windResistance.getDraftingFactor)
+            windCoeff.value = "%2.2f".format(windResistance.getWindResistanceCoefficent)
+
+          }
+
+      }
+    }
+  }, 2000, 500)
 
   val telemetryProps = Array((powerLabel, power), (speedLabel, speed), (heartRateLabel, hr),
     (cadenceLabel, cadence), (distanceLabel, distance), (gearRatioLabel, gearRatio),
     (bikeWeightLabel, bikeWeight), (userWeightLabel, userWeight), (userAgeLabel, userAge),
     (userHeightLabel, userHeight), (wheelDiaLabel, wheelDiameter), (coeffRollingLabel, coeffRolling),
-    (gradientLabel, gradient), (windSpeedLabel, windSpeed))
+    (gradientLabel, gradient), (windSpeedLabel, windSpeed), (windCoeffLabel, windCoeff),
+    (draftingFactorLabel, draftingFactor))
 
   def genSplit: Parent = {
 
@@ -186,11 +201,16 @@ object HelloStageDemo extends JFXApp {
       getInvalidNumTxt,
       (v) => turbo.setHeartrate(Integer.parseUnsignedInt(v)))
 
+    val simulationCellsEnabled = new BooleanProperty {
+      value = false
+    }
+
     val button = new Button {
       text = "press me"
-      onAction = { (e: ActionEvent) => {
-        windSpeed.value = "why such a long string?" 
-      }
+      onAction = { (e: ActionEvent) =>
+        {
+          simulationCellsEnabled.value = !simulationCellsEnabled.value
+        }
       }
     }
 
@@ -291,7 +311,7 @@ object HelloStageDemo extends JFXApp {
   def validateNumber(field: scalafx.scene.control.TextField) = field.text.value.matches("[0-9]+")
 
   var largest: ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds] = null;
-  
+
   def mkTelemetryGrid(): Node = {
 
     val telemetryGrid = new TilePane {
