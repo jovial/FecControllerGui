@@ -68,9 +68,10 @@ import scalafx.beans.binding.ObjectBinding
 import scalafx.beans.value.ObservableValue
 import scalafx.collections.transformation.FilteredBuffer
 import java.util.function.Predicate
+import scalafx.collections.ObservableBuffer
 
-case class Cell(label: StringProperty, value: StringProperty)
-case class GridCellGroup(predicate: () => Boolean, enabled: Option[BooleanProperty], cells: Array[Cell])
+case class Cell(label: String, value: StringProperty)
+case class GridCellGroup(enabled: Option[BooleanProperty], cells: Array[Cell])
 
 object HelloStageDemo extends JFXApp {
 
@@ -153,7 +154,7 @@ object HelloStageDemo extends JFXApp {
             power.value = turboModel.getPower.toString()
             // we are doing conversion from m/s to km/h but we might use km/h internally later
             speed.value = "%2.2f".format(turboModel.getSpeed.doubleValue() * 3.6)
-            hr.value = turboModel.getHeartRate.toString()
+            hr.value = Option(turboModel.getHeartRate).getOrElse(0).toString()
             cadence.value = turboModel.getCadence.toString
             distance.value = "%2.2f".format((turboModel.getDistance / 1000.0))
             gearRatio.value = "%2.2f".format(turboModel.getGearRatio)
@@ -176,16 +177,61 @@ object HelloStageDemo extends JFXApp {
     }
   }, 2000, 500)
 
-  val telemetryProps = Array((powerLabel, power), (speedLabel, speed), (heartRateLabel, hr),
-    (cadenceLabel, cadence), (distanceLabel, distance), (gearRatioLabel, gearRatio),
-    (bikeWeightLabel, bikeWeight), (userWeightLabel, userWeight), (userAgeLabel, userAge),
-    (userHeightLabel, userHeight), (wheelDiaLabel, wheelDiameter), (coeffRollingLabel, coeffRolling),
-    (gradientLabel, gradient), (windSpeedLabel, windSpeed), (windCoeffLabel, windCoeff),
-    (draftingFactorLabel, draftingFactor))
+  val simulationCellsEnabled = new BooleanProperty {
+    value = true
+  }
+
+  val telemetryProps = Array(
+    GridCellGroup(None, Array(Cell(powerLabel, power),
+      Cell(speedLabel, speed), Cell(heartRateLabel, hr),
+      Cell(cadenceLabel, cadence), Cell(distanceLabel, distance), Cell(gearRatioLabel, gearRatio))),
+    GridCellGroup(Some(simulationCellsEnabled), Array(
+      Cell(bikeWeightLabel, bikeWeight), Cell(userWeightLabel, userWeight), Cell(userAgeLabel, userAge),
+      Cell(userHeightLabel, userHeight), Cell(wheelDiaLabel, wheelDiameter), Cell(coeffRollingLabel, coeffRolling),
+      Cell(gradientLabel, gradient), Cell(windSpeedLabel, windSpeed), Cell(windCoeffLabel, windCoeff),
+      Cell(draftingFactorLabel, draftingFactor))))
 
   def genSplit: Parent = {
 
-    val telemetryGrid = mkTelemetryGrid()
+    val telemetryGrid = new TilePane {
+      tileAlignment = Pos.CenterLeft
+      padding = Insets(20)
+      hgap = 10
+      children = genCellGroups()
+    }
+
+    telemetryProps.map(_.enabled).filter(_.nonEmpty).map(_.get).foreach {
+      (e) =>
+        e.onChange {
+          (_, _, _) => telemetryGrid.children = genCellGroups()
+        }
+    }
+
+    val scroll = new ScrollPane() {
+      content = telemetryGrid
+      fitToWidth = true
+      fitToHeight = true
+    }
+
+    scroll.width.onChange {
+      (_, old, newV) =>
+        {
+          val size = newV.doubleValue();
+          var cols = 1
+          if (size >= 600) {
+            cols = 5
+          } else if (size >= 380) {
+            cols = 3
+          } else if (size >= 200) {
+            cols = 2
+          }
+
+          val actual = (size - 40 - 10 * cols) / cols
+
+          theWidth.value = actual
+
+        }
+    }
 
     val powerInput = mkInput(
       StringProperty("Power"),
@@ -200,10 +246,6 @@ object HelloStageDemo extends JFXApp {
       validateNumber,
       getInvalidNumTxt,
       (v) => turbo.setHeartrate(Integer.parseUnsignedInt(v)))
-
-    val simulationCellsEnabled = new BooleanProperty {
-      value = false
-    }
 
     val button = new Button {
       text = "press me"
@@ -224,14 +266,6 @@ object HelloStageDemo extends JFXApp {
       prefColumns = 1
       children = Seq(powerInput, hrInput, button, button2)
     }
-
-    val split = new SplitPane {
-      padding = Insets(20)
-      dividerPositions_=(0.8)
-      items ++= Seq(telemetryGrid, rightSide);
-    }
-
-    SplitPane.setResizableWithParent(rightSide, false)
 
     val border = new BorderPane
 
@@ -256,7 +290,7 @@ object HelloStageDemo extends JFXApp {
       style = "-fx-border-width: 1; -fx-border-style: solid;"
     }
 
-    border.center = telemetryGrid
+    border.center = scroll
     border.right = rightSide
     border.bottom = status
 
@@ -312,32 +346,35 @@ object HelloStageDemo extends JFXApp {
 
   var largest: ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds] = null;
 
-  def mkTelemetryGrid(): Node = {
+  val theWidth = new DoubleProperty {
+    value = 1
+  }
 
-    val telemetryGrid = new TilePane {
-      tileAlignment = Pos.CenterLeft
-      padding = Insets(20)
-      hgap = 10
+  def genCellGroups(): List[Group] = {
+    var cells = List[Group]()
+    for (cg <- telemetryProps) {
+      if (cg.enabled.getOrElse(new BooleanProperty { value = true }).value) {
+        cells ++= genCells(cg.cells).reverse
+      }
     }
+    cells
+  }
 
-    var cells = List[VBox]()
-
-    val theWidth = new DoubleProperty {
-      value = 1
-    }
+  def genCells(rawCells: Array[Cell]): List[Group] = {
+    var labelValuePairs = List[VBox]()
+    var cells = List[Group]()
 
     val scaleFactor = new DoubleProperty {
       value = 1
     }
 
-    for (a <- 0 until telemetryProps.length) {
-
+    for (a <- 0 until rawCells.length) {
       val label = new Label {
-        text = telemetryProps(a)._1
+        text = rawCells(a).label
       }
 
       val value = new Text {
-        text <== telemetryProps(a)._2
+        text <== rawCells(a).value
         style = "-fx-font-size: 200%"
       }
 
@@ -360,8 +397,9 @@ object HelloStageDemo extends JFXApp {
         children = labelDataPair
       }
 
-      cells = labelDataPair :: cells
-      telemetryGrid.children += gridCell
+      labelValuePairs = labelDataPair :: labelValuePairs
+      cells = gridCell :: cells
+
     }
 
     def helper(a: ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds], b: ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds]): ObjectBinding[javafx.geometry.Bounds] = {
@@ -379,7 +417,7 @@ object HelloStageDemo extends JFXApp {
 
     val ty = new ObjectProperty[javafx.geometry.Bounds]() {
     }
-    largest = cells.map(_.boundsInLocal).foldLeft(ty.asInstanceOf[ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds]])((a, b) => helper(a, b))
+    largest = labelValuePairs.map(_.boundsInLocal).foldLeft(ty.asInstanceOf[ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds]])((a, b) => helper(a, b))
 
     largest.onChange {
       (_, a, b) =>
@@ -389,34 +427,7 @@ object HelloStageDemo extends JFXApp {
         }
     }
 
-    val scroll = new ScrollPane() {
-      content = telemetryGrid
-      fitToWidth = true
-      fitToHeight = true
-    }
-
-    scroll.width.onChange {
-      (_, old, newV) =>
-        {
-          val size = newV.doubleValue();
-          var cols = 1
-          if (size >= 600) {
-            cols = 5
-          } else if (size >= 380) {
-            cols = 3
-          } else if (size >= 200) {
-            cols = 2
-          }
-
-          val actual = (size - 40 - 10 * cols) / cols
-
-          theWidth.value = actual
-
-        }
-    }
-
-    scroll
-
+    cells
   }
 
   val split = genSplit
