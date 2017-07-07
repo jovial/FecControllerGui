@@ -69,16 +69,17 @@ import scalafx.beans.value.ObservableValue
 import scalafx.collections.transformation.FilteredBuffer
 import java.util.function.Predicate
 import scalafx.collections.ObservableBuffer
+import org.cowboycoders.ant.profiles.FecProfile
+import javafx.scene.text.TextBoundsType
 
 case class Cell(label: String, value: StringProperty)
 case class GridCellGroup(enabled: Option[BooleanProperty], cells: Array[Cell])
 
 object HelloStageDemo extends JFXApp {
 
-  val turbo = new DummyFecTurbo();
-  val antInterface = new AntTransceiver(0);
+  val turbo = new FecProfile()
+  val antInterface = new AntTransceiver(1);
   val antNode = new org.cowboycoders.ant.Node(antInterface);
-  val turboModel = turbo.getState
 
   val turboThread = new Thread() {
     override def run() = {
@@ -151,25 +152,25 @@ object HelloStageDemo extends JFXApp {
       Platform.runLater {
         () =>
           {
-            power.value = turboModel.getPower.toString()
-            // we are doing conversion from m/s to km/h but we might use km/h internally later
-            speed.value = "%2.2f".format(turboModel.getSpeed.doubleValue() * 3.6)
-            hr.value = Option(turboModel.getHeartRate).getOrElse(0).toString()
-            cadence.value = turboModel.getCadence.toString
-            distance.value = "%2.2f".format((turboModel.getDistance / 1000.0))
-            gearRatio.value = "%2.2f".format(turboModel.getGearRatio)
-            bikeWeight.value = "%2.2f".format(turboModel.getBikeWeight)
-            val athlete = turboModel.getAthlete
-            userWeight.value = "%2.2f".format(athlete.getWeight)
-            userHeight.value = "%2.0f".format(athlete.getHeight)
-            userAge.value = "%d".format(athlete.getAge)
-            wheelDiameter.value = "%2.2f".format(turboModel.getWheelDiameter)
-            gradient.value = "%2.2f".format(turboModel.getTrackResistance.getGradient)
-            coeffRolling.value = "%2.2f".format(turboModel.getTrackResistance.getCoefficientRollingResistance)
-            val windResistance = turboModel.getWindResistance
-            windSpeed.value = "%d".format(windResistance.getWindSpeed)
-            draftingFactor.value = "%2.2f".format(windResistance.getDraftingFactor)
-            windCoeff.value = "%2.2f".format(windResistance.getWindResistanceCoefficent)
+//            power.value = turboModel.getPower.toString()
+//            // we are doing conversion from m/s to km/h but we might use km/h internally later
+//            speed.value = "%2.2f".format(turboModel.getSpeed.doubleValue() * 3.6)
+//            hr.value = Option(turboModel.getHeartRate).getOrElse(0).toString()
+//            cadence.value = turboModel.getCadence.toString
+//            distance.value = "%2.2f".format((turboModel.getDistance / 1000.0))
+//            gearRatio.value = "%2.2f".format(turboModel.getGearRatio)
+//            bikeWeight.value = "%2.2f".format(turboModel.getBikeWeight)
+//            val athlete = turboModel.getAthlete
+//            userWeight.value = "%2.2f".format(athlete.getWeight)
+//            userHeight.value = "%2.0f".format(athlete.getHeight)
+//            userAge.value = "%d".format(athlete.getAge)
+//            wheelDiameter.value = "%2.2f".format(turboModel.getWheelDiameter)
+//            gradient.value = "%2.2f".format(turboModel.getTrackResistance.getGradient)
+//            coeffRolling.value = "%2.2f".format(turboModel.getTrackResistance.getCoefficientRollingResistance)
+//            val windResistance = turboModel.getWindResistance
+//            windSpeed.value = "%d".format(windResistance.getWindSpeed)
+//            draftingFactor.value = "%2.2f".format(windResistance.getDraftingFactor)
+//            windCoeff.value = "%2.2f".format(windResistance.getWindResistanceCoefficent)
 
           }
 
@@ -180,6 +181,8 @@ object HelloStageDemo extends JFXApp {
   val simulationCellsEnabled = new BooleanProperty {
     value = true
   }
+  
+  val testGrid = new GridPane()
 
   val telemetryProps = Array(
     GridCellGroup(None, Array(Cell(powerLabel, power),
@@ -191,6 +194,11 @@ object HelloStageDemo extends JFXApp {
       Cell(gradientLabel, gradient), Cell(windSpeedLabel, windSpeed), Cell(windCoeffLabel, windCoeff),
       Cell(draftingFactorLabel, draftingFactor))))
 
+      
+  val numCols = new IntegerProperty() {
+    value = 1
+  }
+  
   def genSplit: Parent = {
 
     val telemetryGrid = new TilePane {
@@ -206,12 +214,19 @@ object HelloStageDemo extends JFXApp {
           (_, _, _) => telemetryGrid.children = genCellGroups()
         }
     }
+    
+    val statsVBox = new VBox();
 
     val scroll = new ScrollPane() {
-      content = telemetryGrid
+      content = statsVBox
       fitToWidth = true
       fitToHeight = true
     }
+    
+    genTable()
+    
+    statsVBox.children += telemetryGrid
+    statsVBox.children += testGrid
 
     scroll.width.onChange {
       (_, old, newV) =>
@@ -229,26 +244,43 @@ object HelloStageDemo extends JFXApp {
           val actual = (size - 40 - 10 * cols) / cols
 
           theWidth.value = actual
-
+          numCols.value = cols
         }
     }
+    
+    
+    
+    numCols.onChange {
+      (_, old, new_) => {
+        val percent = 100.0 / new_.doubleValue()
+        val constraints = (0 until new_.intValue()).toList
+          .map(_ => new ColumnConstraints {
+            percentWidth = percent
+          })
+        testGrid.columnConstraints = constraints
+        genTable()
+      }
+  
+    }
+    
+
 
     val powerInput = mkInput(
       StringProperty("Power"),
       StringProperty("Set power (w)"),
       validateNumber,
       getInvalidNumTxt,
-      (v) => turbo.setPower(Integer.parseUnsignedInt(v)))
+      (v) => println(v))
 
     val hrInput = mkInput(
       StringProperty("Heart rate"),
       StringProperty("Set heart rate (bpm)"),
       validateNumber,
       getInvalidNumTxt,
-      (v) => turbo.setHeartrate(Integer.parseUnsignedInt(v)))
+      (v) => println(v))
 
-    val button = new Button {
-      text = "press me"
+    val simCellsButton = new Button {
+      text = "Toggle simulation cells"
       onAction = { (e: ActionEvent) =>
         {
           simulationCellsEnabled.value = !simulationCellsEnabled.value
@@ -256,15 +288,15 @@ object HelloStageDemo extends JFXApp {
       }
     }
 
-    val button2 = new Button {
-      text = "press me"
-      onAction = { (e: ActionEvent) => windSpeed.value = "" }
+    val reqCapsButtons = new Button {
+      text = "Request capabilities"
+      onAction = { (e: ActionEvent) => turbo.requestCapabilities() }
     }
 
     val rightSide = new TilePane {
       margin = Insets(10)
       prefColumns = 1
-      children = Seq(powerInput, hrInput, button, button2)
+      children = Seq(powerInput, hrInput, simCellsButton, reqCapsButtons)
     }
 
     val border = new BorderPane
@@ -358,6 +390,59 @@ object HelloStageDemo extends JFXApp {
       }
     }
     cells
+  }
+  
+  def genTable() {
+    val dummy = for {
+      group <- telemetryProps
+      cell <- group.cells
+    } yield new VBox{children = Seq(
+          new Label("label"),
+          new Text("text")
+    )}
+    
+    testGrid.delegate.setGridLinesVisible(true)
+    
+
+    
+    val groups = dummy.map(x => new Group {
+      children = x
+      hgrow = Priority.Always 
+      })
+      
+    val groups2 = groups.map (x =>  new HBox {
+       children = x 
+    }
+    )
+    
+    groups2(0).layoutBounds.onChange {(_, old, new_) => {
+      val vbox = dummy(0)
+      val g = groups2(0)
+      val w = new_.getWidth
+      val pw = vbox.delegate.prefWidth(-1)
+      println("w: " + w + " pw: " + pw)
+      if (w == 0 || pw == 0) return
+      println(w/pw)
+      vbox.scaleX = w/pw * 0.66
+      vbox.scaleY = w/pw * 0.66
+    }}
+        
+    
+
+    testGrid.children = Seq()
+    
+    GridPane.setVgrow(groups2(0), Priority.Always)
+    def addThem(row: Int, toAdd: Array[HBox], remaining: Array[HBox]): Unit = {
+      if (toAdd.length == 0) return
+      testGrid.addRow(row, toAdd.map(_.delegate) : _*)
+      val (l,r) = remaining.splitAt(numCols.value)
+      addThem(row + 1, l, r)
+    }
+    
+   val (l,r) = groups2.splitAt(numCols.value)
+   addThem(0,l,r)
+   
+    
   }
 
   def genCells(rawCells: Array[Cell]): List[Group] = {

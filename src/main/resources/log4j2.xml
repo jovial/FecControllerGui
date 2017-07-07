@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration>
+  <Appenders>
+    <Socket name="JLV" host="localhost" port="4445">
+      <SerializedLayout />
+    </Socket>
+  </Appenders>
+  <Loggers>
+    <Root level="WARN">
+      <AppenderRef ref="JLV" />
+    </Root>
+  </Loggers>
+</Configuration>
