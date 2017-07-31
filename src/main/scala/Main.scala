@@ -397,6 +397,8 @@ object HelloStageDemo extends JFXApp {
     * @param header
     */
   def genDecorated(cells: Seq[GridCellGroup], parentBounds: ObjectProperty[javafx.geometry.Bounds], enabled: BooleanProperty, header: Node): Group = {
+
+    //TODO: scale header separately?
     val commonTelemetry = new DynamicTable(cells, parentBounds, numCols)
 
     val decoratedCommonTele = new VBox {
@@ -444,24 +446,6 @@ object HelloStageDemo extends JFXApp {
 
     numCols.onChange {
       (_,o,n) => update()
-    }
-
-    val x = Bindings.createObjectBinding(() => {
-      val x = grid.layoutBounds.get.getWidth
-      val y = parentBounds.value.getWidth
-      if (x == 0.0 || y == 0.0) 1 else
-      {
-        val ret = 0.99 * y / x
-        ret
-      }
-
-    }, grid.layoutBounds, parentBounds)
-
-    x.onChange {
-      (_,o,n) => {
-        //grid.scaleY = n
-        //grid.scaleX = n
-      }
     }
 
     // regen to take into account current disabled/enabled value
