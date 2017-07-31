@@ -188,35 +188,38 @@ object HelloStageDemo extends JFXApp {
   val simulationCellsEnabled = new BooleanProperty {
     value = true
   }
+
+  val telemetryCellsEnabled = new BooleanProperty {
+    value = true
+  }
   
   val testGrid = new GridPane() {
     hgap = 10
     vgap = 10
   }
   
-  val telemetryProps = Array(
+  val telemetryCells = Array(
     GridCellGroup(None, Array(Cell(powerLabel, power),
       Cell(speedLabel, speed), Cell(heartRateLabel, hr),
-      Cell(cadenceLabel, cadence), Cell(distanceLabel, distance), Cell(gearRatioLabel, gearRatio))),
-    GridCellGroup(Some(simulationCellsEnabled), Array(
-      Cell(bikeWeightLabel, bikeWeight), Cell(userWeightLabel, userWeight), Cell(userAgeLabel, userAge),
-      Cell(userHeightLabel, userHeight), Cell(wheelDiaLabel, wheelDiameter), Cell(coeffRollingLabel, coeffRolling),
-      Cell(gradientLabel, gradient), Cell(windSpeedLabel, windSpeed), Cell(windCoeffLabel, windCoeff),
-      Cell(draftingFactorLabel, draftingFactor))))
+      Cell(cadenceLabel, cadence), Cell(distanceLabel, distance), Cell(gearRatioLabel, gearRatio)))
+  )
 
-      
+  val simulationCells =  Array(GridCellGroup(Some(simulationCellsEnabled), Array(
+    Cell(bikeWeightLabel, bikeWeight), Cell(userWeightLabel, userWeight), Cell(userAgeLabel, userAge),
+    Cell(userHeightLabel, userHeight), Cell(wheelDiaLabel, wheelDiameter), Cell(coeffRollingLabel, coeffRolling),
+    Cell(gradientLabel, gradient), Cell(windSpeedLabel, windSpeed), Cell(windCoeffLabel, windCoeff),
+    Cell(draftingFactorLabel, draftingFactor))))
+
+
   val numCols = new IntegerProperty() {
     value = 1
   }
-  
-  
-  var x: ObjectBinding[Double] = null
-  
+
   def genSplit: Parent = {
 
 
     val statsVBox = new VBox();
-    
+
     statsVBox.vgrow = Priority.Always
 
     val scroll = new ScrollPane() {
@@ -241,11 +244,9 @@ object HelloStageDemo extends JFXApp {
           val actual = (size - 40 - 10 * cols) / cols
 
           numCols.value = cols
-          
+
         }
     }
-
-    val commonTelemetry = new DynamicTable(telemetryProps, scroll.viewportBounds, numCols)
 
     def genGridTitle(title: String): Label = {
       val label = new Label(title) {
@@ -254,15 +255,8 @@ object HelloStageDemo extends JFXApp {
       label
     }
 
-    val decoratedCommonTele = new VBox {
-
-      children = Seq(genGridTitle("Common telemetry"), new Group {children = commonTelemetry})
-      alignment = Pos.Center
-    }
-
-    decoratedCommonTele.visible <== simulationCellsEnabled
-
-    statsVBox.children += decoratedCommonTele
+    statsVBox.children += genDecorated(telemetryCells, scroll.viewportBounds, telemetryCellsEnabled, genGridTitle("Common telemetry"))
+    statsVBox.children += genDecorated(simulationCells, scroll.viewportBounds, simulationCellsEnabled, genGridTitle("Simulation data"))
 
     val powerInput = mkInput(
       StringProperty("Power"),
@@ -391,6 +385,56 @@ object HelloStageDemo extends JFXApp {
   def validateNumber(field: scalafx.scene.control.TextField) = field.text.value.matches("[0-9]+")
 
 
+  // need object bindings to live as long as Node they are affecting
+  var properties = List[ObjectBinding[Double]]()
+
+  /**
+    * Ensure this object lives as long as you want the scaling to occur. The binding doesn't keep this object alive.
+    * garbage collected)
+    * @param cells
+    * @param parentBounds
+    * @param enabled
+    * @param header
+    */
+  def genDecorated(cells: Seq[GridCellGroup], parentBounds: ObjectProperty[javafx.geometry.Bounds], enabled: BooleanProperty, header: Node): Group = {
+    val commonTelemetry = new DynamicTable(cells, parentBounds, numCols)
+
+    val decoratedCommonTele = new VBox {
+
+      children = Seq(new Group {children = header}, new Group {
+        children = commonTelemetry
+      })
+      alignment = Pos.Center
+    }
+
+    decoratedCommonTele.visible <== enabled
+
+
+    val scaleBinding = Bindings.createObjectBinding(() => {
+      val x = decoratedCommonTele.layoutBounds.get.getWidth
+      val y = parentBounds.value.getWidth
+      if (x == 0.0 || y == 0.0) 1 else
+      {
+        val ret = 0.99 * y / x
+        ret
+      }
+
+    }, decoratedCommonTele.layoutBounds, parentBounds)
+
+    scaleBinding.onChange {
+      (_,o,n) => {
+        decoratedCommonTele.scaleY = n
+        decoratedCommonTele.scaleX = n
+      }
+    }
+
+    //make sure object binding lives a long time
+    properties = scaleBinding :: properties
+
+    new Group { children = decoratedCommonTele}
+  }
+
+
   class DynamicTable(cells: Seq[GridCellGroup], parentBounds: ObjectProperty[javafx.geometry.Bounds], numCols: IntegerProperty) {
 
     val grid = new GridPane {
@@ -415,8 +459,8 @@ object HelloStageDemo extends JFXApp {
 
     x.onChange {
       (_,o,n) => {
-        grid.scaleY = n
-        grid.scaleX = n
+        //grid.scaleY = n
+        //grid.scaleX = n
       }
     }
 
