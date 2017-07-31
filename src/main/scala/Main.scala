@@ -13,7 +13,7 @@ import scalafx.scene.control.SplitPane
 import scalafx.scene.paint.Color._
 import scalafx.scene.shape.Rectangle
 import scalafx.scene.layout.HBox
-import scalafx.scene.text.Text;
+import scalafx.scene.text.Text
 import scalafx.scene.Node
 import scalafx.scene.layout.GridPane
 import scalafx.scene.layout.StackPane
@@ -30,10 +30,12 @@ import scalafx.scene.control.TextField
 import scalafx.scene.layout.VBox
 import scalafx.scene.text.Font
 import javafx.beans.value.ChangeListener
+
 import scalafx.scene.layout.AnchorPane
 import scalafx.animation.Timeline
 import scalafx.animation.KeyFrame
 import javafx.util.Duration
+
 import scalafx.geometry.Pos
 import scalafx.scene.layout.Region
 import scalafx.scene.control.Label
@@ -59,18 +61,23 @@ import javafx.event.EventHandler
 import javafx.stage.WindowEvent
 import java.util.Timer
 import java.util.TimerTask
+
 import scalafx.beans.property.ObjectProperty
 import scalafx.event.subscriptions.Subscription
 import javafx.beans.value.ObservableNumberValue
 import javafx.beans.binding.DoubleBinding
+
 import scalafx.beans.binding.Bindings
 import scalafx.beans.binding.ObjectBinding
 import scalafx.beans.value.ObservableValue
 import scalafx.collections.transformation.FilteredBuffer
 import java.util.function.Predicate
+
 import scalafx.collections.ObservableBuffer
 import org.cowboycoders.ant.profiles.FecProfile
 import javafx.scene.text.TextBoundsType
+
+import HelloStageDemo.numCols
 
 case class Cell(label: String, value: StringProperty)
 case class GridCellGroup(enabled: Option[BooleanProperty], cells: Array[Cell])
@@ -182,8 +189,11 @@ object HelloStageDemo extends JFXApp {
     value = true
   }
   
-  val testGrid = new GridPane()
-
+  val testGrid = new GridPane() {
+    hgap = 10
+    vgap = 10
+  }
+  
   val telemetryProps = Array(
     GridCellGroup(None, Array(Cell(powerLabel, power),
       Cell(speedLabel, speed), Cell(heartRateLabel, hr),
@@ -199,39 +209,26 @@ object HelloStageDemo extends JFXApp {
     value = 1
   }
   
+  
+  var x: ObjectBinding[Double] = null
+  
   def genSplit: Parent = {
 
-    val telemetryGrid = new TilePane {
-      tileAlignment = Pos.CenterLeft
-      padding = Insets(20)
-      hgap = 10
-      children = genCellGroups()
-    }
 
-    telemetryProps.map(_.enabled).filter(_.nonEmpty).map(_.get).foreach {
-      (e) =>
-        e.onChange {
-          (_, _, _) => telemetryGrid.children = genCellGroups()
-        }
-    }
-    
     val statsVBox = new VBox();
+    
+    statsVBox.vgrow = Priority.Always
 
     val scroll = new ScrollPane() {
       content = statsVBox
       fitToWidth = true
-      fitToHeight = true
+      fitToHeight = false
     }
-    
-    genTable()
-    
-    statsVBox.children += telemetryGrid
-    statsVBox.children += testGrid
 
-    scroll.width.onChange {
+    scroll.layoutBounds.onChange {
       (_, old, newV) =>
         {
-          val size = newV.doubleValue();
+          val size = newV.width
           var cols = 1
           if (size >= 600) {
             cols = 5
@@ -243,27 +240,29 @@ object HelloStageDemo extends JFXApp {
 
           val actual = (size - 40 - 10 * cols) / cols
 
-          theWidth.value = actual
           numCols.value = cols
+          
         }
     }
-    
-    
-    
-    numCols.onChange {
-      (_, old, new_) => {
-        val percent = 100.0 / new_.doubleValue()
-        val constraints = (0 until new_.intValue()).toList
-          .map(_ => new ColumnConstraints {
-            percentWidth = percent
-          })
-        testGrid.columnConstraints = constraints
-        genTable()
-      }
-  
-    }
-    
 
+    val commonTelemetry = new DynamicTable(telemetryProps, scroll.viewportBounds, numCols)
+
+    def genGridTitle(title: String): Label = {
+      val label = new Label(title) {
+        style = "-fx-font-size:20"
+      }
+      label
+    }
+
+    val decoratedCommonTele = new VBox {
+
+      children = Seq(genGridTitle("Common telemetry"), new Group {children = commonTelemetry})
+      alignment = Pos.Center
+    }
+
+    decoratedCommonTele.visible <== simulationCellsEnabled
+
+    statsVBox.children += decoratedCommonTele
 
     val powerInput = mkInput(
       StringProperty("Power"),
@@ -292,19 +291,34 @@ object HelloStageDemo extends JFXApp {
       text = "Request capabilities"
       onAction = { (e: ActionEvent) => turbo.requestCapabilities() }
     }
+    
+    val disableGrid = new Button {
+      text = "Clear grid"
+      onAction = { (e: ActionEvent) => testGrid.requestLayout() }
+    }
+    
+    val scaleBox = mkInput(
+      StringProperty("vbox scale"),
+      StringProperty("vbox scale"),
+      (x) => true,
+      getInvalidNumTxt,
+      (v) => {
+        println(v)
+        })
 
     val rightSide = new TilePane {
       margin = Insets(10)
       prefColumns = 1
-      children = Seq(powerInput, hrInput, simCellsButton, reqCapsButtons)
+      children = Seq(powerInput, hrInput, simCellsButton, reqCapsButtons, disableGrid, scaleBox)
     }
 
     val border = new BorderPane
+   
 
     val statusLight = new Rectangle {
       height = 30
       fill = Color.Green
-      width <== 30
+      width = 30
     }
 
     val statusText = new Text {
@@ -376,144 +390,82 @@ object HelloStageDemo extends JFXApp {
 
   def validateNumber(field: scalafx.scene.control.TextField) = field.text.value.matches("[0-9]+")
 
-  var largest: ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds] = null;
 
-  val theWidth = new DoubleProperty {
-    value = 1
-  }
+  class DynamicTable(cells: Seq[GridCellGroup], parentBounds: ObjectProperty[javafx.geometry.Bounds], numCols: IntegerProperty) {
 
-  def genCellGroups(): List[Group] = {
-    var cells = List[Group]()
-    for (cg <- telemetryProps) {
-      if (cg.enabled.getOrElse(new BooleanProperty { value = true }).value) {
-        cells ++= genCells(cg.cells).reverse
-      }
-    }
-    cells
-  }
-  
-  def genTable() {
-    val dummy = for {
-      group <- telemetryProps
-      cell <- group.cells
-    } yield new VBox{children = Seq(
-          new Label("label"),
-          new Text("text")
-    )}
-    
-    testGrid.delegate.setGridLinesVisible(true)
-    
-
-    
-    val groups = dummy.map(x => new Group {
-      children = x
-      hgrow = Priority.Always 
-      })
-      
-    val groups2 = groups.map (x =>  new HBox {
-       children = x 
-    }
-    )
-    
-    groups2(0).layoutBounds.onChange {(_, old, new_) => {
-      val vbox = dummy(0)
-      val g = groups2(0)
-      val w = new_.getWidth
-      val pw = vbox.delegate.prefWidth(-1)
-      println("w: " + w + " pw: " + pw)
-      if (w == 0 || pw == 0) return
-      println(w/pw)
-      vbox.scaleX = w/pw * 0.66
-      vbox.scaleY = w/pw * 0.66
-    }}
-        
-    
-
-    testGrid.children = Seq()
-    
-    GridPane.setVgrow(groups2(0), Priority.Always)
-    def addThem(row: Int, toAdd: Array[HBox], remaining: Array[HBox]): Unit = {
-      if (toAdd.length == 0) return
-      testGrid.addRow(row, toAdd.map(_.delegate) : _*)
-      val (l,r) = remaining.splitAt(numCols.value)
-      addThem(row + 1, l, r)
-    }
-    
-   val (l,r) = groups2.splitAt(numCols.value)
-   addThem(0,l,r)
-   
-    
-  }
-
-  def genCells(rawCells: Array[Cell]): List[Group] = {
-    var labelValuePairs = List[VBox]()
-    var cells = List[Group]()
-
-    val scaleFactor = new DoubleProperty {
-      value = 1
+    val grid = new GridPane {
+      hgap = 10
+      vgap = 10
     }
 
-    for (a <- 0 until rawCells.length) {
-      val label = new Label {
-        text = rawCells(a).label
+    numCols.onChange {
+      (_,o,n) => update()
+    }
+
+    val x = Bindings.createObjectBinding(() => {
+      val x = grid.layoutBounds.get.getWidth
+      val y = parentBounds.value.getWidth
+      if (x == 0.0 || y == 0.0) 1 else
+      {
+        val ret = 0.99 * y / x
+        ret
       }
 
-      val value = new Text {
-        text <== rawCells(a).value
-        style = "-fx-font-size: 200%"
-      }
+    }, grid.layoutBounds, parentBounds)
 
-      val labelDataPair = new VBox() {
-        children = Seq(label, value)
+    x.onChange {
+      (_,o,n) => {
+        grid.scaleY = n
+        grid.scaleX = n
+      }
+    }
+
+    // regen to take into account current disabled/enabled value
+    private def genNodes: Seq[VBox] =
+      for {
+        group <- cells
+        if group.enabled.getOrElse(new BooleanProperty {
+          value = true
+        }).value
+        cell <- group.cells
+      } yield new VBox {
+        children = Seq(
+          new Label(cell.label),
+          new Text {
+            text <== cell.value
+            style = "-fx-font-size: 200%"
+          }
+        );
         padding = Insets(20)
       }
 
-      labelDataPair.boundsInLocal.onChange {
-        (_, o, n) =>
-          {
-            val a = n.getWidth
-            labelDataPair.scaleX <== scaleFactor
-            labelDataPair.scaleY <== scaleFactor
-          }
+
+    cells.map(_.enabled).distinct.foreach(_.foreach(_.onChange {
+      (_,o,n) => update()
+    }))
+
+    update()
+
+    def addThem(row: Int, toAdd: Seq[VBox], remaining: Seq[VBox]): Unit = {
+      if (toAdd.length == 0) return
+      for (i <- toAdd) {
       }
-
-      // second group to take into account scaled bounds
-      val gridCell = new Group {
-        children = labelDataPair
-      }
-
-      labelValuePairs = labelDataPair :: labelValuePairs
-      cells = gridCell :: cells
-
+      grid.addRow(row, toAdd.map(_.delegate) : _*)
+      val (l,r) = remaining.splitAt(numCols.value)
+      addThem(row + 1, l, r)
     }
 
-    def helper(a: ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds], b: ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds]): ObjectBinding[javafx.geometry.Bounds] = {
-      Bindings.createObjectBinding(() => {
-        (Option(a.value), Option(b.value)) match {
-          case (Some(a), Some(b)) => if (a.getWidth > b.getWidth) a else b
-          case (_, Some(b))       => b
-          case (Some(a), _)       => a
-          case _                  => throw new RuntimeException()
-        }
-
-      },
-        a, b)
+    def update() = {
+      grid.children = Seq()
+      val nodes = genNodes
+      val (l, r) = nodes.splitAt(numCols.value)
+      addThem(0,l,r)
     }
 
-    val ty = new ObjectProperty[javafx.geometry.Bounds]() {
-    }
-    largest = labelValuePairs.map(_.boundsInLocal).foldLeft(ty.asInstanceOf[ObservableValue[javafx.geometry.Bounds, javafx.geometry.Bounds]])((a, b) => helper(a, b))
 
-    largest.onChange {
-      (_, a, b) =>
-        {
-          //scaleFactor.unbind() // unsure if this is necessary
-          scaleFactor <== theWidth / (b.getWidth / 0.98)
-        }
-    }
-
-    cells
   }
+
+  implicit def dynamicTable2(a: DynamicTable): Node = a.grid
 
   val split = genSplit
 
@@ -523,7 +475,7 @@ object HelloStageDemo extends JFXApp {
   }
 
   stage = new JFXApp.PrimaryStage {
-    title.value = "Formica Sim"
+    title.value = "Formica Controller"
     width = 600
     height = 450
     scene = theScene
