@@ -1,95 +1,40 @@
 /**
- * Created by fluxoid on 17/02/17.
- */
+  * Created by fluxoid on 17/02/17.
+  */
 
-import org.cowboycoders.ant.profiles.simulators._
+import java.util.{Timer, TimerTask}
+import javafx.stage.WindowEvent
+
+import org.cowboycoders.ant.interfaces.AntTransceiver
+import org.cowboycoders.ant.profiles.FecProfile
 
 import scalafx.Includes._
-import scalafx.application.JFXApp
-import scalafx.beans.property.StringProperty
-import scalafx.scene.Scene
-import scalafx.scene.control.Button
-import scalafx.scene.control.SplitPane
+import scalafx.application.{JFXApp, Platform}
+import scalafx.beans.binding.{Bindings, ObjectBinding}
+import scalafx.beans.property.{BooleanProperty, IntegerProperty, ObjectProperty, StringProperty}
+import scalafx.event.ActionEvent
+import scalafx.geometry.{Insets, Pos}
+import scalafx.scene.{Group, Node, Parent, Scene}
+import scalafx.scene.control.Alert.AlertType
+import scalafx.scene.control._
+import scalafx.scene.layout._
+import scalafx.scene.paint.Color
 import scalafx.scene.paint.Color._
 import scalafx.scene.shape.Rectangle
-import scalafx.scene.layout.HBox
 import scalafx.scene.text.Text
-import scalafx.scene.Node
-import scalafx.scene.layout.GridPane
-import scalafx.scene.layout.StackPane
-import scalafx.scene.layout.BorderPane
-import scalafx.scene.layout.FlowPane
-import scalafx.scene.control.TextArea
-import scalafx.scene.layout.ColumnConstraints
-import scalafx.scene.Parent
-import scalafx.geometry.Insets
-import scalafx.scene.layout.RowConstraints
-import scalafx.scene.layout.Priority
-import scalafx.scene.layout.TilePane
-import scalafx.scene.control.TextField
-import scalafx.scene.layout.VBox
-import scalafx.scene.text.Font
-import javafx.beans.value.ChangeListener
-
-import scalafx.scene.layout.AnchorPane
-import scalafx.animation.Timeline
-import scalafx.animation.KeyFrame
-import javafx.util.Duration
-
-import scalafx.geometry.Pos
-import scalafx.scene.layout.Region
-import scalafx.scene.control.Label
-import scalafx.beans.property.DoubleProperty
-import scalafx.scene.Group
-import scalafx.beans.property.IntegerProperty
-import scalafx.scene.control.ScrollPane
-import scalafx.event.ActionEvent
-import scalafx.application.Platform
-import scalafx.scene.control.Dialog
-import scalafx.stage.StageStyle
-import scalafx.scene.control.ButtonType
-import scalafx.beans.property.ReadOnlyProperty
-import scalafx.scene.paint.Color
-import scalafx.scene.text.TextAlignment
-import scalafx.beans.property.BooleanProperty
-import scalafx.scene.control.Alert
-import scalafx.scene.control.Alert.AlertType
-import scalafx.beans.property.ReadOnlyObjectProperty
-import scalafx.geometry.Bounds
-import org.cowboycoders.ant.interfaces.AntTransceiver
-import javafx.event.EventHandler
-import javafx.stage.WindowEvent
-import java.util.Timer
-import java.util.TimerTask
-
-import scalafx.beans.property.ObjectProperty
-import scalafx.event.subscriptions.Subscription
-import javafx.beans.value.ObservableNumberValue
-import javafx.beans.binding.DoubleBinding
-
-import scalafx.beans.binding.Bindings
-import scalafx.beans.binding.ObjectBinding
-import scalafx.beans.value.ObservableValue
-import scalafx.collections.transformation.FilteredBuffer
-import java.util.function.Predicate
-
-import scalafx.collections.ObservableBuffer
-import org.cowboycoders.ant.profiles.FecProfile
-import javafx.scene.text.TextBoundsType
-
-import HelloStageDemo.numCols
 
 case class Cell(label: String, value: StringProperty)
+
 case class GridCellGroup(enabled: Option[BooleanProperty], cells: Array[Cell])
 
 object HelloStageDemo extends JFXApp {
 
   val turbo = new FecProfile()
-  val antInterface = new AntTransceiver(1);
-  val antNode = new org.cowboycoders.ant.Node(antInterface);
+  val antInterface = new AntTransceiver(1)
+  val antNode = new org.cowboycoders.ant.Node(antInterface)
 
   val turboThread = new Thread() {
-    override def run() = {
+    override def run(): Unit = {
       println("Node starting")
       antNode.start()
       antNode.reset()
@@ -155,31 +100,30 @@ object HelloStageDemo extends JFXApp {
   val draftingFactorLabel = "Drafting factor"
 
   timer.scheduleAtFixedRate(new TimerTask() {
-    override def run = {
+    override def run(): Unit = {
       Platform.runLater {
-        () =>
-          {
-//            power.value = turboModel.getPower.toString()
-//            // we are doing conversion from m/s to km/h but we might use km/h internally later
-//            speed.value = "%2.2f".format(turboModel.getSpeed.doubleValue() * 3.6)
-//            hr.value = Option(turboModel.getHeartRate).getOrElse(0).toString()
-//            cadence.value = turboModel.getCadence.toString
-//            distance.value = "%2.2f".format((turboModel.getDistance / 1000.0))
-//            gearRatio.value = "%2.2f".format(turboModel.getGearRatio)
-//            bikeWeight.value = "%2.2f".format(turboModel.getBikeWeight)
-//            val athlete = turboModel.getAthlete
-//            userWeight.value = "%2.2f".format(athlete.getWeight)
-//            userHeight.value = "%2.0f".format(athlete.getHeight)
-//            userAge.value = "%d".format(athlete.getAge)
-//            wheelDiameter.value = "%2.2f".format(turboModel.getWheelDiameter)
-//            gradient.value = "%2.2f".format(turboModel.getTrackResistance.getGradient)
-//            coeffRolling.value = "%2.2f".format(turboModel.getTrackResistance.getCoefficientRollingResistance)
-//            val windResistance = turboModel.getWindResistance
-//            windSpeed.value = "%d".format(windResistance.getWindSpeed)
-//            draftingFactor.value = "%2.2f".format(windResistance.getDraftingFactor)
-//            windCoeff.value = "%2.2f".format(windResistance.getWindResistanceCoefficent)
+        () => {
+          //            power.value = turboModel.getPower.toString()
+          //            // we are doing conversion from m/s to km/h but we might use km/h internally later
+          //            speed.value = "%2.2f".format(turboModel.getSpeed.doubleValue() * 3.6)
+          //            hr.value = Option(turboModel.getHeartRate).getOrElse(0).toString()
+          //            cadence.value = turboModel.getCadence.toString
+          //            distance.value = "%2.2f".format((turboModel.getDistance / 1000.0))
+          //            gearRatio.value = "%2.2f".format(turboModel.getGearRatio)
+          //            bikeWeight.value = "%2.2f".format(turboModel.getBikeWeight)
+          //            val athlete = turboModel.getAthlete
+          //            userWeight.value = "%2.2f".format(athlete.getWeight)
+          //            userHeight.value = "%2.0f".format(athlete.getHeight)
+          //            userAge.value = "%d".format(athlete.getAge)
+          //            wheelDiameter.value = "%2.2f".format(turboModel.getWheelDiameter)
+          //            gradient.value = "%2.2f".format(turboModel.getTrackResistance.getGradient)
+          //            coeffRolling.value = "%2.2f".format(turboModel.getTrackResistance.getCoefficientRollingResistance)
+          //            val windResistance = turboModel.getWindResistance
+          //            windSpeed.value = "%d".format(windResistance.getWindSpeed)
+          //            draftingFactor.value = "%2.2f".format(windResistance.getDraftingFactor)
+          //            windCoeff.value = "%2.2f".format(windResistance.getWindResistanceCoefficent)
 
-          }
+        }
 
       }
     }
@@ -192,19 +136,19 @@ object HelloStageDemo extends JFXApp {
   val telemetryCellsEnabled = new BooleanProperty {
     value = true
   }
-  
+
   val testGrid = new GridPane() {
     hgap = 10
     vgap = 10
   }
-  
+
   val telemetryCells = Array(
     GridCellGroup(None, Array(Cell(powerLabel, power),
       Cell(speedLabel, speed), Cell(heartRateLabel, hr),
       Cell(cadenceLabel, cadence), Cell(distanceLabel, distance), Cell(gearRatioLabel, gearRatio)))
   )
 
-  val simulationCells =  Array(GridCellGroup(Some(simulationCellsEnabled), Array(
+  val simulationCells = Array(GridCellGroup(Some(simulationCellsEnabled), Array(
     Cell(bikeWeightLabel, bikeWeight), Cell(userWeightLabel, userWeight), Cell(userAgeLabel, userAge),
     Cell(userHeightLabel, userHeight), Cell(wheelDiaLabel, wheelDiameter), Cell(coeffRollingLabel, coeffRolling),
     Cell(gradientLabel, gradient), Cell(windSpeedLabel, windSpeed), Cell(windCoeffLabel, windCoeff),
@@ -218,7 +162,7 @@ object HelloStageDemo extends JFXApp {
   def genSplit: Parent = {
 
 
-    val statsVBox = new VBox();
+    val statsVBox = new VBox()
 
     statsVBox.vgrow = Priority.Always
 
@@ -229,23 +173,20 @@ object HelloStageDemo extends JFXApp {
     }
 
     scroll.layoutBounds.onChange {
-      (_, old, newV) =>
-        {
-          val size = newV.width
-          var cols = 1
-          if (size >= 600) {
-            cols = 5
-          } else if (size >= 380) {
-            cols = 3
-          } else if (size >= 200) {
-            cols = 2
-          }
-
-          val actual = (size - 40 - 10 * cols) / cols
-
-          numCols.value = cols
-
+      (_, _, newV) => {
+        val size = newV.width
+        var cols = 1
+        if (size >= 600) {
+          cols = 5
+        } else if (size >= 380) {
+          cols = 3
+        } else if (size >= 200) {
+          cols = 2
         }
+
+        numCols.value = cols
+
+      }
     }
 
     def genGridTitle(title: String): Label = {
@@ -274,31 +215,30 @@ object HelloStageDemo extends JFXApp {
 
     val simCellsButton = new Button {
       text = "Toggle simulation cells"
-      onAction = { (e: ActionEvent) =>
-        {
-          simulationCellsEnabled.value = !simulationCellsEnabled.value
-        }
+      onAction = { (_: ActionEvent) => {
+        simulationCellsEnabled.value = !simulationCellsEnabled.value
+      }
       }
     }
 
     val reqCapsButtons = new Button {
       text = "Request capabilities"
-      onAction = { (e: ActionEvent) => turbo.requestCapabilities() }
+      onAction = { (_: ActionEvent) => turbo.requestCapabilities() }
     }
-    
+
     val disableGrid = new Button {
       text = "Clear grid"
-      onAction = { (e: ActionEvent) => testGrid.requestLayout() }
+      onAction = { (_: ActionEvent) => testGrid.requestLayout() }
     }
-    
+
     val scaleBox = mkInput(
       StringProperty("vbox scale"),
       StringProperty("vbox scale"),
-      (x) => true,
+      (_) => true,
       getInvalidNumTxt,
       (v) => {
         println(v)
-        })
+      })
 
     val rightSide = new TilePane {
       margin = Insets(10)
@@ -307,7 +247,7 @@ object HelloStageDemo extends JFXApp {
     }
 
     val border = new BorderPane
-   
+
 
     val statusLight = new Rectangle {
       height = 30
@@ -338,30 +278,28 @@ object HelloStageDemo extends JFXApp {
   }
 
   def mkInput(labelTxt: StringProperty, promptTxt: StringProperty, validate: (scalafx.scene.control.TextField) => Boolean,
-              getErrorTxt: (scalafx.scene.control.TextField) => String, onAccept: (String) => Unit) = {
+              getErrorTxt: (scalafx.scene.control.TextField) => String, onAccept: (String) => Unit): Node = {
     val inputField = new TextField() {
       promptText <== promptTxt
     }
 
     // validate an integer
     inputField.focused.onChange {
-      ((
-        s, o, n) => if (!n && !validate(inputField))
+      (
+        _, _, n) =>
+        if (!n && !validate(inputField))
         // unfocused
-        inputField.text = "")
+          inputField.text = ""
     }
 
-    inputField.onAction = (ae: ActionEvent) => {
+    inputField.onAction = (_: ActionEvent) => {
       if (validate(inputField)) {
         onAccept(inputField.text.value)
         inputField.text = ""
-      } else {
-
-        new Alert(AlertType.Error) {
-          title = "Error"
-          contentText = getErrorTxt(inputField)
-        }.showAndWait()
-      }
+      } else new Alert(AlertType.Error) {
+        title = "Error"
+        contentText = getErrorTxt(inputField)
+      }.showAndWait()
 
     }
 
@@ -378,11 +316,11 @@ object HelloStageDemo extends JFXApp {
     inputPair
   }
 
-  def getInvalidNumTxt(field: scalafx.scene.control.TextField) = {
+  private def getInvalidNumTxt(field: scalafx.scene.control.TextField)= {
     field.text.value + " is invalid. You must enter a valid number"
   }
 
-  def validateNumber(field: scalafx.scene.control.TextField) = field.text.value.matches("[0-9]+")
+  private def validateNumber(field: scalafx.scene.control.TextField) = field.text.value.matches("[0-9]+")
 
 
   // need object bindings to live as long as Node they are affecting
@@ -391,10 +329,6 @@ object HelloStageDemo extends JFXApp {
   /**
     * Ensure this object lives as long as you want the scaling to occur. The binding doesn't keep this object alive.
     * garbage collected)
-    * @param cells
-    * @param parentBounds
-    * @param enabled
-    * @param header
     */
   def genDecorated(cells: Seq[GridCellGroup], parentBounds: ObjectProperty[javafx.geometry.Bounds], enabled: BooleanProperty, header: Node): Group = {
 
@@ -403,7 +337,9 @@ object HelloStageDemo extends JFXApp {
 
     val decoratedCommonTele = new VBox {
 
-      children = Seq(new Group {children = header}, new Group {
+      children = Seq(new Group {
+        children = header
+      }, new Group {
         children = commonTelemetry
       })
       alignment = Pos.Center
@@ -415,8 +351,7 @@ object HelloStageDemo extends JFXApp {
     val scaleBinding = Bindings.createObjectBinding(() => {
       val x = decoratedCommonTele.layoutBounds.get.getWidth
       val y = parentBounds.value.getWidth
-      if (x == 0.0 || y == 0.0) 1 else
-      {
+      if (x == 0.0 || y == 0.0) 1 else {
         val ret = 0.99 * y / x
         ret
       }
@@ -424,16 +359,19 @@ object HelloStageDemo extends JFXApp {
     }, decoratedCommonTele.layoutBounds, parentBounds)
 
     scaleBinding.onChange {
-      (_,o,n) => {
+      (_, _, n) => {
         decoratedCommonTele.scaleY = n
         decoratedCommonTele.scaleX = n
       }
     }
 
-    //make sure object binding lives a long time
+    //make sure object binding lives a long time. It would be better if we could link it the nodes lifetime in the
+    //scene graph. Possibly by creating a proxy and delegating all methods.
     properties = scaleBinding :: properties
 
-    new Group { children = decoratedCommonTele}
+    new Group {
+      children = decoratedCommonTele
+    }
   }
 
 
@@ -445,7 +383,7 @@ object HelloStageDemo extends JFXApp {
     }
 
     numCols.onChange {
-      (_,o,n) => update()
+      (_, _, _) => update()
     }
 
     // regen to take into account current disabled/enabled value
@@ -463,31 +401,29 @@ object HelloStageDemo extends JFXApp {
             text <== cell.value
             style = "-fx-font-size: 200%"
           }
-        );
+        )
         padding = Insets(20)
       }
 
 
     cells.map(_.enabled).distinct.foreach(_.foreach(_.onChange {
-      (_,o,n) => update()
+      (_,_, _) => update()
     }))
 
     update()
 
     def addThem(row: Int, toAdd: Seq[VBox], remaining: Seq[VBox]): Unit = {
-      if (toAdd.length == 0) return
-      for (i <- toAdd) {
-      }
-      grid.addRow(row, toAdd.map(_.delegate) : _*)
-      val (l,r) = remaining.splitAt(numCols.value)
+      if (toAdd.isEmpty) return
+      grid.addRow(row, toAdd.map(_.delegate): _*)
+      val (l, r) = remaining.splitAt(numCols.value)
       addThem(row + 1, l, r)
     }
 
-    def update() = {
+    def update(): Unit = {
       grid.children = Seq()
       val nodes = genNodes
       val (l, r) = nodes.splitAt(numCols.value)
-      addThem(0,l,r)
+      addThem(0, l, r)
     }
 
 
@@ -510,13 +446,9 @@ object HelloStageDemo extends JFXApp {
   }
 
   // kill the background thread
-  stage.onCloseRequest = new EventHandler[WindowEvent] {
-
-    override def handle(e: WindowEvent): Unit = {
-      Platform.exit();
-      antNode.stop()
-      System.exit(0);
-    }
-
+  stage.onCloseRequest = (_: WindowEvent) => {
+    Platform.exit()
+    antNode.stop()
+    System.exit(0)
   }
 }
