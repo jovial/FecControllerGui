@@ -2,12 +2,14 @@
   * Created by fluxoid on 17/02/17.
   */
 
+import java.util.prefs.Preferences
 import java.util.{Timer, TimerTask}
 import javafx.stage.WindowEvent
 
 import org.cowboycoders.ant.interfaces.AntTransceiver
 import org.cowboycoders.ant.profiles.FecProfile
 
+import scala.language.implicitConversions
 import scalafx.Includes._
 import scalafx.application.{JFXApp, Platform}
 import scalafx.beans.binding.{Bindings, ObjectBinding}
@@ -28,6 +30,10 @@ case class Cell(label: String, value: StringProperty)
 case class GridCellGroup(enabled: Option[BooleanProperty], cells: Array[Cell])
 
 object HelloStageDemo extends JFXApp {
+
+  private val SHOW_SIMULATION_PREF = "showCommon"
+
+  val pref = Preferences.userNodeForPackage(HelloStageDemo.getClass)
 
   val turbo = new FecProfile()
   val antInterface = new AntTransceiver(1)
@@ -129,8 +135,15 @@ object HelloStageDemo extends JFXApp {
     }
   }, 2000, 500)
 
-  val simulationCellsEnabled = new BooleanProperty {
-    value = true
+  val simulationCellsEnabled = mkPersistentBool(SHOW_SIMULATION_PREF)
+
+  private def mkPersistentBool(prefId: String): BooleanProperty = {
+    val ret = new BooleanProperty {
+      value = pref.getBoolean(prefId, false)
+    }
+    ret.onChange{ (_, _, n) => {
+      pref.putBoolean(prefId, n)}}
+    ret
   }
 
   val telemetryCellsEnabled = new BooleanProperty {
@@ -213,13 +226,25 @@ object HelloStageDemo extends JFXApp {
       getInvalidNumTxt,
       (v) => println(v))
 
-    val simCellsButton = new Button {
-      text = "Toggle simulation cells"
-      onAction = { (_: ActionEvent) => {
-        simulationCellsEnabled.value = !simulationCellsEnabled.value
-      }
-      }
+    val commonCellToggle = new CheckBox {
+      text = "common data"
+      selected = true
     }
+
+    telemetryCellsEnabled <==> commonCellToggle.selected
+
+    val simulationCellToggle = new CheckBox {
+      text = "simulation data"
+      selected = simulationCellsEnabled.value
+    }
+
+    simulationCellsEnabled <==> simulationCellToggle.selected
+
+
+    val checkBoxContainer = new VBox() {
+      children = Seq(commonCellToggle, simulationCellToggle)
+    }
+
 
     val reqCapsButtons = new Button {
       text = "Request capabilities"
@@ -243,7 +268,7 @@ object HelloStageDemo extends JFXApp {
     val rightSide = new TilePane {
       margin = Insets(10)
       prefColumns = 1
-      children = Seq(powerInput, hrInput, simCellsButton, reqCapsButtons, disableGrid, scaleBox)
+      children = Seq(powerInput, hrInput, reqCapsButtons, disableGrid, scaleBox, checkBoxContainer)
     }
 
     val border = new BorderPane
