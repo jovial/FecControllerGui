@@ -31,7 +31,8 @@ case class GridCellGroup(enabled: Option[BooleanProperty], cells: Array[Cell])
 
 object HelloStageDemo extends JFXApp {
 
-  private val SHOW_SIMULATION_PREF = "showCommon"
+  private val SHOW_SIMULATION_PREF = "showSimulation"
+  private val SHOW_COMMON_PREF = "showCommon"
 
   val pref = Preferences.userNodeForPackage(HelloStageDemo.getClass)
 
@@ -135,7 +136,12 @@ object HelloStageDemo extends JFXApp {
     }
   }, 2000, 500)
 
-  val simulationCellsEnabled = mkPersistentBool(SHOW_SIMULATION_PREF)
+  var allToggles = List[DisplayToggle]()
+
+  case class DisplayToggle(key: String, desc: String) {
+    val toggle = mkPersistentBool(key)
+    allToggles = this :: allToggles
+  }
 
   private def mkPersistentBool(prefId: String): BooleanProperty = {
     val ret = new BooleanProperty {
@@ -146,9 +152,10 @@ object HelloStageDemo extends JFXApp {
     ret
   }
 
-  val telemetryCellsEnabled = new BooleanProperty {
-    value = true
-  }
+
+  // order matters
+  val simulationCellsEnabled = new DisplayToggle(SHOW_SIMULATION_PREF, "Simulation data")
+  val telemetryCellsEnabled = new DisplayToggle(SHOW_COMMON_PREF, "Common Data")
 
   val testGrid = new GridPane() {
     hgap = 10
@@ -161,7 +168,7 @@ object HelloStageDemo extends JFXApp {
       Cell(cadenceLabel, cadence), Cell(distanceLabel, distance), Cell(gearRatioLabel, gearRatio)))
   )
 
-  val simulationCells = Array(GridCellGroup(Some(simulationCellsEnabled), Array(
+  val simulationCells = Array(GridCellGroup(Some(simulationCellsEnabled.toggle), Array(
     Cell(bikeWeightLabel, bikeWeight), Cell(userWeightLabel, userWeight), Cell(userAgeLabel, userAge),
     Cell(userHeightLabel, userHeight), Cell(wheelDiaLabel, wheelDiameter), Cell(coeffRollingLabel, coeffRolling),
     Cell(gradientLabel, gradient), Cell(windSpeedLabel, windSpeed), Cell(windCoeffLabel, windCoeff),
@@ -209,8 +216,8 @@ object HelloStageDemo extends JFXApp {
       label
     }
 
-    statsVBox.children += genDecorated(telemetryCells, scroll.viewportBounds, telemetryCellsEnabled, genGridTitle("Common telemetry"))
-    statsVBox.children += genDecorated(simulationCells, scroll.viewportBounds, simulationCellsEnabled, genGridTitle("Simulation data"))
+    statsVBox.children += genDecorated(telemetryCells, scroll.viewportBounds, telemetryCellsEnabled.toggle, genGridTitle("Common telemetry"))
+    statsVBox.children += genDecorated(simulationCells, scroll.viewportBounds, simulationCellsEnabled.toggle, genGridTitle("Simulation data"))
 
     val powerInput = mkInput(
       StringProperty("Power"),
@@ -226,23 +233,17 @@ object HelloStageDemo extends JFXApp {
       getInvalidNumTxt,
       (v) => println(v))
 
-    val commonCellToggle = new CheckBox {
-      text = "common data"
-      selected = true
+    def genToggle(displayToggle: DisplayToggle): CheckBox = {
+      val box = new CheckBox {
+        text = displayToggle.desc
+        selected = displayToggle.toggle.value
+      }
+      displayToggle.toggle <==> box.selected
+      box
     }
-
-    telemetryCellsEnabled <==> commonCellToggle.selected
-
-    val simulationCellToggle = new CheckBox {
-      text = "simulation data"
-      selected = simulationCellsEnabled.value
-    }
-
-    simulationCellsEnabled <==> simulationCellToggle.selected
-
 
     val checkBoxContainer = new VBox() {
-      children = Seq(commonCellToggle, simulationCellToggle)
+      children = new Label("data to display:") :: allToggles.map(genToggle(_))
     }
 
 
