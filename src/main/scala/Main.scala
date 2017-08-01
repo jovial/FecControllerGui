@@ -349,7 +349,7 @@ object HelloStageDemo extends JFXApp {
 
 
   // need object bindings to live as long as Node they are affecting
-  var properties = List[ObjectBinding[Double]]()
+  private var bindingKeepAlive = scala.collection.mutable.WeakHashMap[Node, ObjectBinding[_]]()
 
   /**
     * Ensure this object lives as long as you want the scaling to occur. The binding doesn't keep this object alive.
@@ -390,13 +390,14 @@ object HelloStageDemo extends JFXApp {
       }
     }
 
-    //make sure object binding lives a long time. It would be better if we could link it the nodes lifetime in the
-    //scene graph. Possibly by creating a proxy and delegating all methods.
-    properties = scaleBinding :: properties
-
-    new Group {
+    val ret = new Group {
       children = decoratedCommonTele
     }
+
+    //make sure object binding lives long enough
+    bindingKeepAlive(ret) =  scaleBinding
+
+    ret
   }
 
 
