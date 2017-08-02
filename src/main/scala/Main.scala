@@ -8,6 +8,7 @@ import javafx.stage.WindowEvent
 
 import org.cowboycoders.ant.interfaces.AntTransceiver
 import org.cowboycoders.ant.profiles.FecProfile
+import org.cowboycoders.ant.profiles.fitnessequipment.{Capabilities, CapabilitiesBuilder}
 
 import scala.language.implicitConversions
 import scalafx.Includes._
@@ -16,7 +17,6 @@ import scalafx.beans.binding.{Bindings, ObjectBinding}
 import scalafx.beans.property.{BooleanProperty, IntegerProperty, ObjectProperty, StringProperty}
 import scalafx.event.ActionEvent
 import scalafx.geometry.{Insets, Pos}
-import scalafx.scene.{Group, Node, Parent, Scene}
 import scalafx.scene.control.Alert.AlertType
 import scalafx.scene.control._
 import scalafx.scene.layout._
@@ -24,6 +24,7 @@ import scalafx.scene.paint.Color
 import scalafx.scene.paint.Color._
 import scalafx.scene.shape.Rectangle
 import scalafx.scene.text.Text
+import scalafx.scene.{Group, Node, Parent, Scene}
 
 case class Cell(label: String, value: StringProperty)
 
@@ -33,10 +34,9 @@ object HelloStageDemo extends JFXApp {
 
   private val SHOW_SIMULATION_PREF = "showSimulation"
   private val SHOW_COMMON_PREF = "showCommon"
-
+  private val SHOW_CAPS_PREF = "showCaps"
   val pref = Preferences.userNodeForPackage(HelloStageDemo.getClass)
 
-  val turbo = new FecProfile()
   val antInterface = new AntTransceiver(1)
   val antNode = new org.cowboycoders.ant.Node(antInterface)
 
@@ -106,6 +106,25 @@ object HelloStageDemo extends JFXApp {
   val windCoeffLabel = "Wind coeff."
   val draftingFactorLabel = "Drafting factor"
 
+  val unknownStr: String = "unknown"
+
+  // start capabilites
+  val supportBasicLabel = "Supports basic"
+  val supportBasicState = new StringProperty(unknownStr)
+  val maxResistanceLabel = "Max. resistance"
+  val maxResistanceState = new StringProperty(unknownStr)
+
+  def boolToStr(b: Boolean): String = {
+    // TODO: internationalization
+    b.toString
+  }
+
+
+  def updateCapabilites(caps: Capabilities) = {
+    supportBasicState.value = boolToStr(Option(caps.isBasicResistanceModeSupported).getOrElse(false))
+    maxResistanceState.value = "%d".format(caps.getMaximumResistance)
+  }
+
   timer.scheduleAtFixedRate(new TimerTask() {
     override def run(): Unit = {
       Platform.runLater {
@@ -154,8 +173,9 @@ object HelloStageDemo extends JFXApp {
 
 
   // order matters
-  val simulationCellsEnabled = new DisplayToggle(SHOW_SIMULATION_PREF, "Simulation data")
-  val telemetryCellsEnabled = new DisplayToggle(SHOW_COMMON_PREF, "Common Data")
+  val simulationToggle = new DisplayToggle(SHOW_SIMULATION_PREF, "Simulation data")
+  val telemetryToggle = new DisplayToggle(SHOW_COMMON_PREF, "Common Data")
+  val capabilitesToggle = new DisplayToggle(SHOW_CAPS_PREF, "Capabilities")
 
   val testGrid = new GridPane() {
     hgap = 10
@@ -168,11 +188,17 @@ object HelloStageDemo extends JFXApp {
       Cell(cadenceLabel, cadence), Cell(distanceLabel, distance), Cell(gearRatioLabel, gearRatio)))
   )
 
-  val simulationCells = Array(GridCellGroup(Some(simulationCellsEnabled.toggle), Array(
+  val simulationCells = Array(GridCellGroup(Some(simulationToggle.toggle), Array(
     Cell(bikeWeightLabel, bikeWeight), Cell(userWeightLabel, userWeight), Cell(userAgeLabel, userAge),
     Cell(userHeightLabel, userHeight), Cell(wheelDiaLabel, wheelDiameter), Cell(coeffRollingLabel, coeffRolling),
     Cell(gradientLabel, gradient), Cell(windSpeedLabel, windSpeed), Cell(windCoeffLabel, windCoeff),
     Cell(draftingFactorLabel, draftingFactor))))
+
+  val capabilitiesCells = Array(GridCellGroup(None,
+    Array(
+      Cell(supportBasicLabel, supportBasicState),
+      Cell(maxResistanceLabel, maxResistanceState)
+    )))
 
 
   val numCols = new IntegerProperty() {
@@ -216,8 +242,9 @@ object HelloStageDemo extends JFXApp {
       label
     }
 
-    statsVBox.children += genDecorated(telemetryCells, scroll.viewportBounds, telemetryCellsEnabled.toggle, genGridTitle("Common telemetry"))
-    statsVBox.children += genDecorated(simulationCells, scroll.viewportBounds, simulationCellsEnabled.toggle, genGridTitle("Simulation data"))
+    statsVBox.children += genDecorated(telemetryCells, scroll.viewportBounds, telemetryToggle.toggle, genGridTitle("Common telemetry"))
+    statsVBox.children += genDecorated(simulationCells, scroll.viewportBounds, simulationToggle.toggle, genGridTitle("Simulation data"))
+    statsVBox.children += genDecorated(capabilitiesCells, scroll.viewportBounds, capabilitesToggle.toggle, genGridTitle("Capabilities"))
 
     val powerInput = mkInput(
       StringProperty("Power"),
@@ -477,5 +504,11 @@ object HelloStageDemo extends JFXApp {
     Platform.exit()
     antNode.stop()
     System.exit(0)
+  }
+
+  val turbo = new FecProfile {
+    def onCapabilitiesReceived(capabilities: Capabilities): Unit = {
+      updateCapabilites(capabilities)
+    }
   }
 }
