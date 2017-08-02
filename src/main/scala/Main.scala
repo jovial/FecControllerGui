@@ -8,7 +8,7 @@ import javafx.stage.WindowEvent
 
 import org.cowboycoders.ant.interfaces.AntTransceiver
 import org.cowboycoders.ant.profiles.FecProfile
-import org.cowboycoders.ant.profiles.fitnessequipment.{Capabilities, CapabilitiesBuilder}
+import org.cowboycoders.ant.profiles.fitnessequipment.Capabilities
 
 import scala.language.implicitConversions
 import scalafx.Includes._
@@ -39,16 +39,6 @@ object HelloStageDemo extends JFXApp {
 
   val antInterface = new AntTransceiver(1)
   val antNode = new org.cowboycoders.ant.Node(antInterface)
-
-  val turboThread = new Thread() {
-    override def run(): Unit = {
-      println("Node starting")
-      antNode.start()
-      antNode.reset()
-      turbo.start(antNode)
-    }
-  }
-  turboThread.start()
 
   val timer = new Timer()
 
@@ -120,9 +110,9 @@ object HelloStageDemo extends JFXApp {
   }
 
 
-  def updateCapabilites(caps: Capabilities) = {
+  private def updateCapabilites(caps: Capabilities) = {
     supportBasicState.value = boolToStr(Option(caps.isBasicResistanceModeSupported).getOrElse(false))
-    maxResistanceState.value = "%d".format(caps.getMaximumResistance)
+    maxResistanceState.value = Option(caps.getMaximumResistance).map(_.toString).getOrElse(unknownStr)
   }
 
   timer.scheduleAtFixedRate(new TimerTask() {
@@ -158,7 +148,7 @@ object HelloStageDemo extends JFXApp {
   var allToggles = List[DisplayToggle]()
 
   case class DisplayToggle(key: String, desc: String) {
-    val toggle = mkPersistentBool(key)
+    val toggle: BooleanProperty = mkPersistentBool(key)
     allToggles = this :: allToggles
   }
 
@@ -173,9 +163,9 @@ object HelloStageDemo extends JFXApp {
 
 
   // order matters
-  val simulationToggle = new DisplayToggle(SHOW_SIMULATION_PREF, "Simulation data")
-  val telemetryToggle = new DisplayToggle(SHOW_COMMON_PREF, "Common Data")
-  val capabilitesToggle = new DisplayToggle(SHOW_CAPS_PREF, "Capabilities")
+  val simulationToggle = DisplayToggle(SHOW_SIMULATION_PREF, "Simulation data")
+  val telemetryToggle = DisplayToggle(SHOW_COMMON_PREF, "Common Data")
+  val capabilitesToggle = DisplayToggle(SHOW_CAPS_PREF, "Capabilities")
 
   val testGrid = new GridPane() {
     hgap = 10
@@ -270,7 +260,7 @@ object HelloStageDemo extends JFXApp {
     }
 
     val checkBoxContainer = new VBox() {
-      children = new Label("data to display:") :: allToggles.map(genToggle(_))
+      children = new Label("data to display:") :: allToggles.map(genToggle)
     }
 
 
@@ -506,9 +496,21 @@ object HelloStageDemo extends JFXApp {
     System.exit(0)
   }
 
+  // this stuff is last to ensure all variables are initialised
+
   val turbo = new FecProfile {
     def onCapabilitiesReceived(capabilities: Capabilities): Unit = {
       updateCapabilites(capabilities)
     }
   }
+
+  val turboThread = new Thread() {
+    override def run(): Unit = {
+      println("Node starting")
+      antNode.start()
+      antNode.reset()
+      turbo.start(antNode)
+    }
+  }
+  turboThread.start()
 }
