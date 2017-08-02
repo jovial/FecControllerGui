@@ -99,20 +99,28 @@ object HelloStageDemo extends JFXApp {
   val unknownStr: String = "unknown"
 
   // start capabilites
-  val supportBasicLabel = "Supports basic"
+  val supportBasicLabel = "Basic resistance support"
   val supportBasicState = new StringProperty(unknownStr)
+  val supportSimulationLabel = "Simulation support"
+  val supportSimulationState = new StringProperty(unknownStr)
+  val supportPowerLabel = "Const. power support"
+  val supportPowerState = new StringProperty(unknownStr)
   val maxResistanceLabel = "Max. resistance"
   val maxResistanceState = new StringProperty(unknownStr)
 
-  def boolToStr(b: Boolean): String = {
+  def boolToStr(b: java.lang.Boolean): String = {
+    val nonNull = Option(b).getOrElse(false)
     // TODO: internationalization
-    b.toString
+    nonNull.toString
   }
 
 
   private def updateCapabilites(caps: Capabilities) = {
-    supportBasicState.value = boolToStr(Option(caps.isBasicResistanceModeSupported).getOrElse(false))
+    supportBasicState.value = boolToStr(caps.isBasicResistanceModeSupported)
+    supportPowerState.value = boolToStr(caps.isTargetPowerModeSupported)
+    supportSimulationState.value = boolToStr(caps.isSimulationModeSupported)
     maxResistanceState.value = Option(caps.getMaximumResistance).map(_.toString).getOrElse(unknownStr)
+
   }
 
   timer.scheduleAtFixedRate(new TimerTask() {
@@ -187,7 +195,9 @@ object HelloStageDemo extends JFXApp {
   val capabilitiesCells = Array(GridCellGroup(None,
     Array(
       Cell(supportBasicLabel, supportBasicState),
-      Cell(maxResistanceLabel, maxResistanceState)
+      Cell(maxResistanceLabel, maxResistanceState),
+      Cell(supportSimulationLabel, supportSimulationState),
+      Cell(supportPowerLabel, supportPowerState)
     )))
 
 
