@@ -306,25 +306,10 @@ object HelloStageDemo extends JFXApp {
 
     def mkSendConf: Node = {
 
-      val dia = mkInput(
-        StringProperty("value (m)"),
-        validateDecimal,
-        getInvalidNumTxt,
-        (_) => {},
-        (_) => {}
-      )
 
-      val bWeight = mkInput(
-        StringProperty(" value (kg)"),
-        validateDecimal,
-        getInvalidNumTxt,
-        (_) => {},
-        (_) => {}
-      )
-
-      val uWeight = mkInput(
-        StringProperty(" value (kg)"),
-        validateDecimal,
+      val rearRing = mkInput(
+        StringProperty(" value (teeth)"),
+        validateNumber,
         getInvalidNumTxt,
         (_) => {},
         (_) => {}
@@ -334,15 +319,31 @@ object HelloStageDemo extends JFXApp {
         StringProperty(" value (teeth)"),
         validateNumber,
         getInvalidNumTxt,
-        (_) => {},
+        (_) => {rearRing.requestFocus()},
         (_) => {}
       )
 
-      val rearRing = mkInput(
-        StringProperty(" value (teeth)"),
-        validateNumber,
+      val dia = mkInput(
+        StringProperty("value (m)"),
+        validateDecimal,
         getInvalidNumTxt,
-        (_) => {},
+        (_) => {frontRing.requestFocus()},
+        (_) => {}
+      )
+
+      val bWeight = mkInput(
+        StringProperty(" value (kg)"),
+        validateDecimal,
+        getInvalidNumTxt,
+        (_) => {dia.requestFocus()},
+        (_) => {}
+      )
+
+      val uWeight = mkInput(
+        StringProperty(" value (kg)"),
+        validateDecimal,
+        getInvalidNumTxt,
+        (_) => {bWeight.requestFocus()},
         (_) => {}
       )
 
