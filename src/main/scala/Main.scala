@@ -9,6 +9,8 @@ import javafx.stage.WindowEvent
 
 import org.cowboycoders.ant.interfaces.AntTransceiver
 import org.cowboycoders.ant.profiles.FecProfile
+import org.cowboycoders.ant.profiles.common.events.interfaces.TelemetryEvent
+import org.cowboycoders.ant.profiles.common.events.{AveragedPowerUpdate, DistanceUpdate, InstantPowerUpdate}
 import org.cowboycoders.ant.profiles.fitnessequipment.{Capabilities, Config, ConfigBuilder}
 
 import scala.language.implicitConversions
@@ -22,7 +24,6 @@ import scalafx.scene.control.Alert.AlertType
 import scalafx.scene.control._
 import scalafx.scene.layout._
 import scalafx.scene.paint.Color
-import scalafx.scene.paint.Color._
 import scalafx.scene.shape.Rectangle
 import scalafx.scene.text.Text
 import scalafx.scene.{Group, Node, Parent, Scene}
@@ -118,7 +119,11 @@ object FecControllerMain extends JFXApp {
   val gearRatioState = new StringProperty(unknownStr)
   val bicycleWheelDiameterState = new StringProperty(unknownStr)
 
-
+  // power from summation + event count
+  val powerAvg = new StringProperty() {
+    value = unknownStr
+  }
+  val powerAvgLabel = "Avg Power/w"
 
   def boolToStr(b: java.lang.Boolean): String = {
     val nonNull = Option(b).getOrElse(false)
@@ -200,7 +205,7 @@ object FecControllerMain extends JFXApp {
   }
 
   val telemetryCells = Array(
-    GridCellGroup(None, Array(Cell(powerLabel, power),
+    GridCellGroup(None, Array(Cell(powerLabel, power), Cell(powerAvgLabel, powerAvg),
       Cell(speedLabel, speed), Cell(heartRateLabel, hr),
       Cell(cadenceLabel, cadence), Cell(distanceLabel, distance), Cell(gearRatioLabel, gearRatio)))
   )
@@ -629,7 +634,6 @@ object FecControllerMain extends JFXApp {
   val split = genSplit
 
   val theScene = new Scene {
-    fill = LightGreen
     root = split
   }
 
@@ -667,5 +671,23 @@ object FecControllerMain extends JFXApp {
       turbo.start(antNode)
     }
   }
+
+  turbo.getDataHub.addListener(classOf[AveragedPowerUpdate], (v: AveragedPowerUpdate) => {
+    powerAvg.value = "%2.2f".format(v.getAveragePower.floatValue())
+  })
+
+  turbo.getDataHub.addListener(classOf[InstantPowerUpdate], (v: InstantPowerUpdate) => {
+    power.value = "%2.2f".format(v.getPower.floatValue())
+  })
+
+  turbo.getDataHub.addListener(classOf[DistanceUpdate], (v: DistanceUpdate) => {
+    // raw value is in m, convert to km
+    distance.value = "%2.2f".format(v.getDistance.floatValue() / 1000)
+  })
+
+  turbo.getDataHub.addListener(classOf[TelemetryEvent], (v: TelemetryEvent) => {
+    //println(v)
+  })
+
   turboThread.start()
 }
