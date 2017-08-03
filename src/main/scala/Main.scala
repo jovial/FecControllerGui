@@ -31,14 +31,14 @@ case class Cell(label: String, value: StringProperty)
 
 case class GridCellGroup(enabled: Option[BooleanProperty], cells: Array[Cell])
 
-object HelloStageDemo extends JFXApp {
+object FecControllerMain extends JFXApp {
 
   private val SHOW_SIMULATION_PREF = "showSimulation"
   private val SHOW_COMMON_PREF = "showCommon"
   private val SHOW_CAPS_PREF = "showCaps"
   private val SHOW_CONF_PREF = "showConf"
 
-  val pref = Preferences.userNodeForPackage(HelloStageDemo.getClass)
+  val pref = Preferences.userNodeForPackage(FecControllerMain.getClass)
 
   val antInterface = new AntTransceiver(1)
   val antNode = new org.cowboycoders.ant.Node(antInterface)
