@@ -2,13 +2,14 @@
   * Created by fluxoid on 17/02/17.
   */
 
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.prefs.Preferences
 import java.util.{Timer, TimerTask}
 import javafx.stage.WindowEvent
 
 import org.cowboycoders.ant.interfaces.AntTransceiver
 import org.cowboycoders.ant.profiles.FecProfile
-import org.cowboycoders.ant.profiles.fitnessequipment.Capabilities
+import org.cowboycoders.ant.profiles.fitnessequipment.{Capabilities, Config, ConfigBuilder}
 
 import scala.language.implicitConversions
 import scalafx.Includes._
@@ -35,6 +36,8 @@ object HelloStageDemo extends JFXApp {
   private val SHOW_SIMULATION_PREF = "showSimulation"
   private val SHOW_COMMON_PREF = "showCommon"
   private val SHOW_CAPS_PREF = "showCaps"
+  private val SHOW_CONF_PREF = "showConf"
+
   val pref = Preferences.userNodeForPackage(HelloStageDemo.getClass)
 
   val antInterface = new AntTransceiver(1)
@@ -98,7 +101,7 @@ object HelloStageDemo extends JFXApp {
 
   val unknownStr: String = "unknown"
 
-  // start capabilites
+  // capabilites
   val supportBasicLabel = "Basic resistance support"
   val supportBasicState = new StringProperty(unknownStr)
   val supportSimulationLabel = "Simulation support"
@@ -107,6 +110,15 @@ object HelloStageDemo extends JFXApp {
   val supportPowerState = new StringProperty(unknownStr)
   val maxResistanceLabel = "Max. resistance"
   val maxResistanceState = new StringProperty(unknownStr)
+
+  // config
+  val bicycleWheelDiameterLabel = "Wheel diameter"
+  val userWeightState = new StringProperty(unknownStr)
+  val bikeWeightState = new StringProperty(unknownStr)
+  val gearRatioState = new StringProperty(unknownStr)
+  val bicycleWheelDiameterState = new StringProperty(unknownStr)
+
+
 
   def boolToStr(b: java.lang.Boolean): String = {
     val nonNull = Option(b).getOrElse(false)
@@ -120,7 +132,13 @@ object HelloStageDemo extends JFXApp {
     supportPowerState.value = boolToStr(caps.isTargetPowerModeSupported)
     supportSimulationState.value = boolToStr(caps.isSimulationModeSupported)
     maxResistanceState.value = Option(caps.getMaximumResistance).map(_.toString).getOrElse(unknownStr)
+  }
 
+  private def updateConfig(conf: Config) = {
+    userWeightState.value = "%2.2f".format(conf.getUserWeight.floatValue())
+    bikeWeightState.value = "%2.2f".format(conf.getBicycleWeight.floatValue())
+    gearRatioState.value = "%2.2f".format(conf.getGearRatio.floatValue())
+    bicycleWheelDiameterState.value = "%2.2f".format(conf.getBicycleWheelDiameter.floatValue())
   }
 
   timer.scheduleAtFixedRate(new TimerTask() {
@@ -171,9 +189,10 @@ object HelloStageDemo extends JFXApp {
 
 
   // order matters
+  val configToggle = DisplayToggle(SHOW_CONF_PREF, "Config")
+  val capabilitiesToggle = DisplayToggle(SHOW_CAPS_PREF, "Capabilities")
   val simulationToggle = DisplayToggle(SHOW_SIMULATION_PREF, "Simulation data")
   val telemetryToggle = DisplayToggle(SHOW_COMMON_PREF, "Common Data")
-  val capabilitesToggle = DisplayToggle(SHOW_CAPS_PREF, "Capabilities")
 
   val testGrid = new GridPane() {
     hgap = 10
@@ -200,10 +219,28 @@ object HelloStageDemo extends JFXApp {
       Cell(supportPowerLabel, supportPowerState)
     )))
 
+  val configCells = Array(GridCellGroup(None, Array(
+    Cell(bikeWeightLabel, bikeWeightState),
+    Cell(bicycleWheelDiameterLabel, bicycleWheelDiameterState),
+    Cell(userWeightLabel, userWeightState),
+    Cell(gearRatioLabel, gearRatioState)
+  )))
+
 
   val numCols = new IntegerProperty() {
     value = 1
   }
+
+  val statusMessage = new StringProperty()
+
+  val statusCount = new AtomicInteger(0);
+
+  private def setStatusMsg(a: String) = {
+    val id = statusCount.addAndGet(1)
+    statusMessage.value = id + ": " + a
+  }
+
+  setStatusMsg("No message")
 
   def genSplit: Parent = {
 
@@ -244,21 +281,105 @@ object HelloStageDemo extends JFXApp {
 
     statsVBox.children += genDecorated(telemetryCells, scroll.viewportBounds, telemetryToggle.toggle, genGridTitle("Common telemetry"))
     statsVBox.children += genDecorated(simulationCells, scroll.viewportBounds, simulationToggle.toggle, genGridTitle("Simulation data"))
-    statsVBox.children += genDecorated(capabilitiesCells, scroll.viewportBounds, capabilitesToggle.toggle, genGridTitle("Capabilities"))
+    statsVBox.children += genDecorated(capabilitiesCells, scroll.viewportBounds, capabilitiesToggle.toggle, genGridTitle("Capabilities"))
+    statsVBox.children += genDecorated(configCells, scroll.viewportBounds, configToggle.toggle, genGridTitle("Config"))
 
-    val powerInput = mkInput(
-      StringProperty("Power"),
-      StringProperty("Set power (w)"),
-      validateNumber,
-      getInvalidNumTxt,
-      (v) => println(v))
+    val powerInput = labelNode(StringProperty("Power"))(
+      mkInput(
+        StringProperty("Set power (w)"),
+        validateNumber,
+        getInvalidNumTxt,
+        (v) => println(v)
+      )
+    )
 
-    val hrInput = mkInput(
-      StringProperty("Heart rate"),
-      StringProperty("Set heart rate (bpm)"),
-      validateNumber,
-      getInvalidNumTxt,
-      (v) => println(v))
+    val hrInput = labelNode(StringProperty("Heart rate"))(
+      mkInput(
+        StringProperty("Set heart rate (bpm)"),
+        validateNumber,
+        getInvalidNumTxt,
+        (v) => println(v)
+      )
+    )
+
+
+
+    def mkSendConf: Node = {
+
+      val dia = mkInput(
+        StringProperty("value (m)"),
+        validateDecimal,
+        getInvalidNumTxt,
+        (_) => {},
+        (_) => {}
+      )
+
+      val bWeight = mkInput(
+        StringProperty(" value (kg)"),
+        validateDecimal,
+        getInvalidNumTxt,
+        (_) => {},
+        (_) => {}
+      )
+
+      val uWeight = mkInput(
+        StringProperty(" value (kg)"),
+        validateDecimal,
+        getInvalidNumTxt,
+        (_) => {},
+        (_) => {}
+      )
+
+      val frontRing = mkInput(
+        StringProperty(" value (teeth)"),
+        validateNumber,
+        getInvalidNumTxt,
+        (_) => {},
+        (_) => {}
+      )
+
+      val rearRing = mkInput(
+        StringProperty(" value (teeth)"),
+        validateNumber,
+        getInvalidNumTxt,
+        (_) => {},
+        (_) => {}
+      )
+
+
+      val sendConf = new Button {
+        text = "send config"
+        onAction = { (_: ActionEvent) => {
+          if (bWeight.text.value == "" || uWeight.text.value == "" || dia.text.value == "" || frontRing.text.value == "" || rearRing.text.value == "" ) {
+            new Alert(AlertType.Error) {
+              title = "Error"
+              contentText = "you must fill in all fields with valid data"
+            }.showAndWait()
+          } else {
+            val ratio = frontRing.text.value.toDouble / rearRing.text.value.toDouble
+            val c = new ConfigBuilder()
+              .setBicycleWeight(new java.math.BigDecimal(bWeight.text.value))
+              .setBicycleWheelDiameter(new java.math.BigDecimal(dia.text.value))
+              .setUserWeight(new java.math.BigDecimal(uWeight.text.value))
+              .setGearRatio(new java.math.BigDecimal(ratio))
+              .createConfig()
+            turbo.setConfig(c)
+            setStatusMsg("new config sent")
+          }
+        } }
+        hgrow = Priority.Always
+        maxWidth = Double.MaxValue
+      }
+
+      new VBox() {
+        children = Seq(labelNode(StringProperty("User weight"))(uWeight),
+          labelNode(StringProperty("Bike weight"))(bWeight),
+          labelNode(StringProperty("Wheel diameter"))(dia),
+          labelNode(StringProperty("front ring"))(frontRing),
+          labelNode(StringProperty("rear ring"))(rearRing),
+          sendConf)
+      }
+    }
 
     def genToggle(displayToggle: DisplayToggle): CheckBox = {
       val box = new CheckBox {
@@ -274,29 +395,35 @@ object HelloStageDemo extends JFXApp {
     }
 
 
-    val reqCapsButtons = new Button {
+    val reqCapsButton = new Button {
       text = "Request capabilities"
       onAction = { (_: ActionEvent) => turbo.requestCapabilities() }
+      hgrow = Priority.Always
+      maxWidth = Double.MaxValue
     }
 
-    val disableGrid = new Button {
-      text = "Clear grid"
-      onAction = { (_: ActionEvent) => testGrid.requestLayout() }
+    val reqConfigButton = new Button {
+      text = "Request Config"
+      onAction = { (_: ActionEvent) => turbo.requestConfig() }
+      hgrow = Priority.Always
+      maxWidth = Double.MaxValue
     }
 
-    val scaleBox = mkInput(
-      StringProperty("vbox scale"),
-      StringProperty("vbox scale"),
-      (_) => true,
-      getInvalidNumTxt,
-      (v) => {
-        println(v)
-      })
+    //groups buttons
+    val buttonVBox = new VBox() {
+      children = Seq(reqCapsButton,reqConfigButton)
+    }
 
-    val rightSide = new TilePane {
-      margin = Insets(10)
-      prefColumns = 1
-      children = Seq(powerInput, hrInput, reqCapsButtons, disableGrid, scaleBox, checkBoxContainer)
+
+    val rightVBox = new VBox() {
+      children = Seq(powerInput, hrInput, buttonVBox, checkBoxContainer, mkSendConf)
+      spacing = 10
+    }
+
+
+    val rightSide = new ScrollPane {
+      content = rightVBox
+      fitToWidth = true
     }
 
     val border = new BorderPane
@@ -308,9 +435,12 @@ object HelloStageDemo extends JFXApp {
       width = 30
     }
 
+
     val statusText = new Text {
-      text = "hello"
+      text <== statusMessage
     }
+
+
 
     val statusPane = new BorderPane {
       center = statusText
@@ -330,8 +460,13 @@ object HelloStageDemo extends JFXApp {
     border
   }
 
-  def mkInput(labelTxt: StringProperty, promptTxt: StringProperty, validate: (scalafx.scene.control.TextField) => Boolean,
-              getErrorTxt: (scalafx.scene.control.TextField) => String, onAccept: (String) => Unit): Node = {
+  private def clearText(wrapped: TextField): Unit = {
+    wrapped.text.value = ""
+  }
+
+  def mkInput(promptTxt: StringProperty, validate: (scalafx.scene.control.TextField) => Boolean,
+              getErrorTxt: (scalafx.scene.control.TextField) => String, onAccept: (String) => Unit,
+              onAfterAccept: (TextField) => Unit = clearText): TextField = {
     val inputField = new TextField() {
       promptText <== promptTxt
     }
@@ -348,7 +483,7 @@ object HelloStageDemo extends JFXApp {
     inputField.onAction = (_: ActionEvent) => {
       if (validate(inputField)) {
         onAccept(inputField.text.value)
-        inputField.text = ""
+        onAfterAccept(inputField)
       } else new Alert(AlertType.Error) {
         title = "Error"
         contentText = getErrorTxt(inputField)
@@ -356,15 +491,19 @@ object HelloStageDemo extends JFXApp {
 
     }
 
+    inputField
+  }
+
+  private def labelNode(labelTxt: StringProperty)(a:Node): Node = {
     val inputLabel = new Label {
       text <== labelTxt
-      labelFor = inputField
+      labelFor = a
     }
 
     val inputPair = new VBox {
       //margin = Insets(10)
       padding = Insets(5)
-      children = Seq(inputLabel, inputField)
+      children = Seq(inputLabel, a)
     }
     inputPair
   }
@@ -374,6 +513,7 @@ object HelloStageDemo extends JFXApp {
   }
 
   private def validateNumber(field: scalafx.scene.control.TextField) = field.text.value.matches("[0-9]+")
+  private def validateDecimal(field: scalafx.scene.control.TextField) = field.text.value.matches("[0-9]+([.][0-9]+)?")
 
 
   // need object bindings to live as long as Node they are affecting
@@ -509,8 +649,12 @@ object HelloStageDemo extends JFXApp {
   // this stuff is last to ensure all variables are initialised
 
   val turbo = new FecProfile {
-    def onCapabilitiesReceived(capabilities: Capabilities): Unit = {
+    override def onCapabilitiesReceived(capabilities: Capabilities): Unit = {
       updateCapabilites(capabilities)
+    }
+
+    override def onConfigRecieved(config: Config): Unit = {
+      updateConfig(config)
     }
   }
 
