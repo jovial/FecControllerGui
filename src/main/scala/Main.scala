@@ -233,7 +233,7 @@ object HelloStageDemo extends JFXApp {
 
   val statusMessage = new StringProperty()
 
-  val statusCount = new AtomicInteger(0);
+  val statusCount = new AtomicInteger(0)
 
   private def setStatusMsg(a: String) = {
     val id = statusCount.addAndGet(1)
@@ -517,7 +517,7 @@ object HelloStageDemo extends JFXApp {
 
 
   // need object bindings to live as long as Node they are affecting
-  private var bindingKeepAlive = scala.collection.mutable.WeakHashMap[Node, ObjectBinding[_]]()
+  private val bindingKeepAlive = scala.collection.mutable.WeakHashMap[Node, ObjectBinding[_]]()
 
   /**
     * Ensure this object lives as long as you want the scaling to occur. The binding doesn't keep this object alive.
