@@ -4,14 +4,14 @@
 
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.prefs.Preferences
-import java.util.{Timer, TimerTask}
 import javafx.stage.WindowEvent
 
 import org.cowboycoders.ant.interfaces.AntTransceiver
 import org.cowboycoders.ant.profiles.FecProfile
-import org.cowboycoders.ant.profiles.common.events.interfaces.TelemetryEvent
-import org.cowboycoders.ant.profiles.common.events.{AveragedPowerUpdate, DistanceUpdate, InstantPowerUpdate}
-import org.cowboycoders.ant.profiles.fitnessequipment.{Capabilities, Config, ConfigBuilder}
+import org.cowboycoders.ant.profiles.common.events._
+import org.cowboycoders.ant.profiles.common.events.interfaces.TaggedTelemetryEvent
+import org.cowboycoders.ant.profiles.fitnessequipment.pages.CalibrationProgress
+import org.cowboycoders.ant.profiles.fitnessequipment.{Capabilities, Config, ConfigBuilder, Defines}
 
 import scala.language.implicitConversions
 import scalafx.Includes._
@@ -44,30 +44,31 @@ object FecControllerMain extends JFXApp {
   val antInterface = new AntTransceiver(1)
   val antNode = new org.cowboycoders.ant.Node(antInterface)
 
-  val timer = new Timer()
+  val unknownStr: String = "unknown"
+
 
   val power = new StringProperty() {
-    value = "0"
+    value = unknownStr
   }
 
   val speed = new StringProperty() {
-    value = "10"
+    value = unknownStr
   }
 
   val hr = new StringProperty() {
-    value = "75"
+    value = unknownStr
   }
 
   val cadence = new StringProperty() {
-    value = "75"
+    value = unknownStr
   }
 
   val distance = new StringProperty() {
-    value = "0.00"
+    value = unknownStr
   }
 
-  val gearRatio = new StringProperty() {
-    value = "4.00"
+  val laps = new StringProperty() {
+    value = "0"
   }
 
   val gradient = new StringProperty
@@ -88,6 +89,7 @@ object FecControllerMain extends JFXApp {
   val cadenceLabel = "Cadence/rpm"
   val distanceLabel = "Distance/km"
   val gearRatioLabel = "Gear ratio"
+  val lapsLabel = "Laps"
   val bikeWeightLabel = "Bike weight/kg"
   val userWeightLabel = "User weight/kg"
   val userAgeLabel = "User age/years"
@@ -99,8 +101,6 @@ object FecControllerMain extends JFXApp {
   val windSpeedLabel = "Wind speed/m/s"
   val windCoeffLabel = "Wind coeff."
   val draftingFactorLabel = "Drafting factor"
-
-  val unknownStr: String = "unknown"
 
   // capabilites
   val supportBasicLabel = "Basic resistance support"
@@ -146,36 +146,6 @@ object FecControllerMain extends JFXApp {
     bicycleWheelDiameterState.value = "%2.2f".format(conf.getBicycleWheelDiameter.floatValue())
   }
 
-  timer.scheduleAtFixedRate(new TimerTask() {
-    override def run(): Unit = {
-      Platform.runLater {
-        () => {
-          //            power.value = turboModel.getPower.toString()
-          //            // we are doing conversion from m/s to km/h but we might use km/h internally later
-          //            speed.value = "%2.2f".format(turboModel.getSpeed.doubleValue() * 3.6)
-          //            hr.value = Option(turboModel.getHeartRate).getOrElse(0).toString()
-          //            cadence.value = turboModel.getCadence.toString
-          //            distance.value = "%2.2f".format((turboModel.getDistance / 1000.0))
-          //            gearRatio.value = "%2.2f".format(turboModel.getGearRatio)
-          //            bikeWeight.value = "%2.2f".format(turboModel.getBikeWeight)
-          //            val athlete = turboModel.getAthlete
-          //            userWeight.value = "%2.2f".format(athlete.getWeight)
-          //            userHeight.value = "%2.0f".format(athlete.getHeight)
-          //            userAge.value = "%d".format(athlete.getAge)
-          //            wheelDiameter.value = "%2.2f".format(turboModel.getWheelDiameter)
-          //            gradient.value = "%2.2f".format(turboModel.getTrackResistance.getGradient)
-          //            coeffRolling.value = "%2.2f".format(turboModel.getTrackResistance.getCoefficientRollingResistance)
-          //            val windResistance = turboModel.getWindResistance
-          //            windSpeed.value = "%d".format(windResistance.getWindSpeed)
-          //            draftingFactor.value = "%2.2f".format(windResistance.getDraftingFactor)
-          //            windCoeff.value = "%2.2f".format(windResistance.getWindResistanceCoefficent)
-
-        }
-
-      }
-    }
-  }, 2000, 500)
-
   var allToggles = List[DisplayToggle]()
 
   case class DisplayToggle(key: String, desc: String) {
@@ -207,7 +177,7 @@ object FecControllerMain extends JFXApp {
   val telemetryCells = Array(
     GridCellGroup(None, Array(Cell(powerLabel, power), Cell(powerAvgLabel, powerAvg),
       Cell(speedLabel, speed), Cell(heartRateLabel, hr),
-      Cell(cadenceLabel, cadence), Cell(distanceLabel, distance), Cell(gearRatioLabel, gearRatio)))
+      Cell(cadenceLabel, cadence), Cell(distanceLabel, distance), Cell(lapsLabel, laps)))
   )
 
   val simulationCells = Array(GridCellGroup(Some(simulationToggle.toggle), Array(
@@ -292,18 +262,18 @@ object FecControllerMain extends JFXApp {
     val powerInput = labelNode(StringProperty("Power"))(
       mkInput(
         StringProperty("Set power (w)"),
-        validateNumber,
+        validateDecimal,
         getInvalidNumTxt,
-        (v) => println(v)
+        (v) => turbo.setTargetPower(v.toDouble)
       )
     )
 
-    val hrInput = labelNode(StringProperty("Heart rate"))(
+    val hrInput = labelNode(StringProperty("Basic resistance"))(
       mkInput(
-        StringProperty("Set heart rate (bpm)"),
-        validateNumber,
+        StringProperty("Set basic resistance (%/units)"),
+        validateDecimal,
         getInvalidNumTxt,
-        (v) => println(v)
+        (v) => turbo.setBasicResistance(v.toDouble)
       )
     )
 
@@ -523,7 +493,7 @@ object FecControllerMain extends JFXApp {
 
 
   // need object bindings to live as long as Node they are affecting
-  private val bindingKeepAlive = scala.collection.mutable.WeakHashMap[Node, ObjectBinding[_]]()
+  private val bindingKeepAlive = scala.collection.mutable.HashMap[Node, ObjectBinding[_]]()
 
   /**
     * Ensure this object lives as long as you want the scaling to occur. The binding doesn't keep this object alive.
@@ -569,7 +539,7 @@ object FecControllerMain extends JFXApp {
     }
 
     //make sure object binding lives long enough
-    bindingKeepAlive(ret) =  scaleBinding
+    bindingKeepAlive(ret) = scaleBinding
 
     ret
   }
@@ -661,6 +631,14 @@ object FecControllerMain extends JFXApp {
     override def onConfigRecieved(config: Config): Unit = {
       updateConfig(config)
     }
+
+    override def onEquipmentStateChange(equipmentState: Defines.EquipmentState, equipmentState1: Defines.EquipmentState): Unit = {
+
+    }
+
+    override def onCalibrationUpdate(calibrationProgress: CalibrationProgress): Unit = {
+
+    }
   }
 
   val turboThread = new Thread() {
@@ -672,7 +650,7 @@ object FecControllerMain extends JFXApp {
     }
   }
 
-  turbo.getDataHub.addListener(classOf[AveragedPowerUpdate], (v: AveragedPowerUpdate) => {
+  turbo.getDataHub.addListener(classOf[AveragePowerUpdate], (v: AveragePowerUpdate) => {
     powerAvg.value = "%2.2f".format(v.getAveragePower.floatValue())
   })
 
@@ -685,9 +663,26 @@ object FecControllerMain extends JFXApp {
     distance.value = "%2.2f".format(v.getDistance.floatValue() / 1000)
   })
 
-  turbo.getDataHub.addListener(classOf[TelemetryEvent], (v: TelemetryEvent) => {
-    //println(v)
+  turbo.getDataHub.addListener(classOf[HeartRateUpdate], (v: HeartRateUpdate) => {
+    hr.value = "%d".format(v.getHeartRate)
   })
+
+  turbo.getDataHub.addListener(classOf[SpeedUpdate], (v: SpeedUpdate) => {
+    speed.value = "%2.2f".format(v.getSpeed.floatValue())
+  })
+
+  turbo.getDataHub.addListener(classOf[CadenceUpdate], (v: CadenceUpdate) => {
+    cadence.value = "%d".format(v.getCadence)
+  })
+
+  turbo.getDataHub.addListener(classOf[TaggedTelemetryEvent], (v: TaggedTelemetryEvent) => {
+    //println(s"tag:${v.getTag}, event:$v")
+  })
+
+  turbo.getDataHub.addListener(classOf[LapUpdate], (v:LapUpdate) => {
+    laps.value = "%d".format(v.getLaps)
+  })
+
 
   turboThread.start()
 }

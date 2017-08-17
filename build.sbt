@@ -1,4 +1,4 @@
-name := "formica-sim-gui"
+name := "fec-controller-gui"
 
 version := "1.0"
 
