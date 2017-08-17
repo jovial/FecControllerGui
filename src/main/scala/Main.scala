@@ -679,6 +679,10 @@ object FecControllerMain extends JFXApp {
     //println(s"tag:${v.getTag}, event:$v")
   })
 
+  turbo.getDataHub.addListener(classOf[CoastDetectedEvent], (v: CoastDetectedEvent) => {
+    println("coast from: " + v.getTag())
+  })
+
   turbo.getDataHub.addListener(classOf[LapUpdate], (v:LapUpdate) => {
     laps.value = "%d".format(v.getLaps)
   })
