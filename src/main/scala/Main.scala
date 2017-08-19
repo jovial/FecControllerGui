@@ -2,15 +2,17 @@
   * Created by fluxoid on 17/02/17.
   */
 
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.prefs.Preferences
 import javafx.stage.WindowEvent
 
 import org.cowboycoders.ant.interfaces.AntTransceiver
 import org.cowboycoders.ant.profiles.FecProfile
+import org.cowboycoders.ant.profiles.common.FilteredBroadcastMessenger
 import org.cowboycoders.ant.profiles.common.events._
 import org.cowboycoders.ant.profiles.common.events.interfaces.TaggedTelemetryEvent
-import org.cowboycoders.ant.profiles.fitnessequipment.pages.CalibrationProgress
+import org.cowboycoders.ant.profiles.fitnessequipment.pages.{CalibrationProgress, GeneralData, TorqueData, TrainerData}
 import org.cowboycoders.ant.profiles.fitnessequipment.{Capabilities, Config, ConfigBuilder, Defines}
 
 import scala.language.implicitConversions
@@ -650,40 +652,63 @@ object FecControllerMain extends JFXApp {
     }
   }
 
-  turbo.getDataHub.addListener(classOf[AveragePowerUpdate], (v: AveragePowerUpdate) => {
+  private val prioritisedTimeout = TimeUnit.SECONDS.toNanos(1)
+
+  private val prioritisedBus = new FilteredBroadcastMessenger[TaggedTelemetryEvent]()
+
+  private val priorities = Array[EventPrioritiser.PrioritisedEvent](
+    new PrioritisedEventBuilder(classOf[SpeedUpdate])
+      .setTagPriorities(classOf[GeneralData], classOf[TorqueData])
+      .createPrioritisedEvent(),
+    new PrioritisedEventBuilder(classOf[DistanceUpdate])
+        .setTagPriorities(classOf[GeneralData], classOf[TorqueData])
+        .createPrioritisedEvent(),
+    new PrioritisedEventBuilder(classOf[CoastEvent])
+      .setTagPriorities(classOf[TrainerData], classOf[TorqueData])
+      .createPrioritisedEvent()
+
+  )
+
+
+  private val prioritiser = new BufferedEventPrioritiser(prioritisedBus, priorities)
+
+  turbo.getDataHub.addListener(classOf[TaggedTelemetryEvent], prioritiser)
+
+
+  prioritisedBus.addListener(classOf[AveragePowerUpdate], (v: AveragePowerUpdate) => {
     powerAvg.value = "%2.2f".format(v.getAveragePower.floatValue())
   })
 
-  turbo.getDataHub.addListener(classOf[InstantPowerUpdate], (v: InstantPowerUpdate) => {
+  prioritisedBus.addListener(classOf[InstantPowerUpdate], (v: InstantPowerUpdate) => {
     power.value = "%2.2f".format(v.getPower.floatValue())
   })
 
-  turbo.getDataHub.addListener(classOf[DistanceUpdate], (v: DistanceUpdate) => {
+  prioritisedBus.addListener(classOf[DistanceUpdate], (v: DistanceUpdate) => {
     // raw value is in m, convert to km
     distance.value = "%2.2f".format(v.getDistance.floatValue() / 1000)
   })
 
-  turbo.getDataHub.addListener(classOf[HeartRateUpdate], (v: HeartRateUpdate) => {
+  prioritisedBus.addListener(classOf[HeartRateUpdate], (v: HeartRateUpdate) => {
     hr.value = "%d".format(v.getHeartRate)
   })
 
-  turbo.getDataHub.addListener(classOf[SpeedUpdate], (v: SpeedUpdate) => {
+  prioritisedBus.addListener(classOf[SpeedUpdate], (v: SpeedUpdate) => {
     speed.value = "%2.2f".format(v.getSpeed.floatValue())
   })
 
-  turbo.getDataHub.addListener(classOf[CadenceUpdate], (v: CadenceUpdate) => {
+  prioritisedBus.addListener(classOf[CadenceUpdate], (v: CadenceUpdate) => {
     cadence.value = "%d".format(v.getCadence)
   })
 
-  turbo.getDataHub.addListener(classOf[TaggedTelemetryEvent], (v: TaggedTelemetryEvent) => {
+  prioritisedBus.addListener(classOf[TaggedTelemetryEvent], (v: TaggedTelemetryEvent) => {
     //println(s"tag:${v.getTag}, event:$v")
   })
 
-  turbo.getDataHub.addListener(classOf[CoastDetectedEvent], (v: CoastDetectedEvent) => {
+  prioritisedBus.addListener(classOf[CoastDetectedEvent], (v: CoastDetectedEvent) => {
     println("coast from: " + v.getTag())
   })
 
-  turbo.getDataHub.addListener(classOf[LapUpdate], (v:LapUpdate) => {
+  prioritisedBus.addListener(classOf[LapUpdate], (v:LapUpdate) => {
     laps.value = "%d".format(v.getLaps)
   })
 
