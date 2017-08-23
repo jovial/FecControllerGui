@@ -160,6 +160,10 @@ object FecControllerMain extends JFXApp {
   private val calibrationSuccess: LabelValuePair = LabelValuePair("Calibration success")
   private val coastingPair: LabelValuePair = LabelValuePair("Coasting")
 
+  private val connected = new BooleanProperty {
+    value = false
+  }
+
 
   private def updateCapabilites(caps: Capabilities): Unit = {
     supportBasicState.value = boolToStr(caps.isBasicResistanceModeSupported)
@@ -479,7 +483,7 @@ object FecControllerMain extends JFXApp {
 
     val statusLight = new Rectangle {
       height = 30
-      fill = Color.Green
+      fill <== when(connected) choose Color.Green otherwise Color.Red
       width = 30
     }
 
@@ -728,6 +732,14 @@ object FecControllerMain extends JFXApp {
       temperature.value.value = temperatureToString(calibrationResponse.getTemp())
       calibrationSuccess.value.value = boolToStr(calibrationResponse.isSpinDownSuccess() || calibrationResponse.isZeroOffsetSuccess)
     }
+
+    override def onConnect() = {
+      connected.value = true
+    }
+
+    override def onDisconnect() = {
+      connected.value = false
+    }
   }
 
   private def temperatureToString(progress: java.math.BigDecimal) = {
@@ -805,8 +817,6 @@ object FecControllerMain extends JFXApp {
   prioritisedBus.addListener(classOf[LapUpdate], (v:LapUpdate) => {
     laps.value = "%d".format(v.getLaps())
   })
-
-
 
 
   turboThread.start()
