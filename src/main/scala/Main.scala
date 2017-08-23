@@ -2,20 +2,23 @@
   * Created by fluxoid on 17/02/17.
   */
 
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.prefs.Preferences
+import javafx.event
+import javafx.event.EventHandler
 import javafx.stage.WindowEvent
 
+import org.cowboycoders.ant
 import org.cowboycoders.ant.interfaces.AntTransceiver
 import org.cowboycoders.ant.profiles.FecProfile
 import org.cowboycoders.ant.profiles.common.FilteredBroadcastMessenger
 import org.cowboycoders.ant.profiles.common.events._
 import org.cowboycoders.ant.profiles.common.events.interfaces.TaggedTelemetryEvent
-import org.cowboycoders.ant.profiles.fitnessequipment.pages.{CalibrationProgress, GeneralData, TorqueData, TrainerData}
+import org.cowboycoders.ant.profiles.fitnessequipment.pages._
 import org.cowboycoders.ant.profiles.fitnessequipment.{Capabilities, Config, ConfigBuilder, Defines}
 
 import scala.language.implicitConversions
+import scala.util.Try
 import scalafx.Includes._
 import scalafx.application.{JFXApp, Platform}
 import scalafx.beans.binding.{Bindings, ObjectBinding}
@@ -30,23 +33,35 @@ import scalafx.scene.shape.Rectangle
 import scalafx.scene.text.Text
 import scalafx.scene.{Group, Node, Parent, Scene}
 
-case class Cell(label: String, value: StringProperty)
+
+
+private case class LabelValuePair(label: String, initialValue : String = "unknown") {
+  val value = new StringProperty() {
+    value = initialValue
+  }
+}
+
+case class Cell(label: String, value: StringProperty) {
+  def this (pair: LabelValuePair) {
+    this(pair.label, pair.value)
+  }
+}
 
 case class GridCellGroup(enabled: Option[BooleanProperty], cells: Array[Cell])
 
 object FecControllerMain extends JFXApp {
+  val unknownStr: String = "unknown"
 
   private val SHOW_SIMULATION_PREF = "showSimulation"
   private val SHOW_COMMON_PREF = "showCommon"
   private val SHOW_CAPS_PREF = "showCaps"
   private val SHOW_CONF_PREF = "showConf"
+  private val SHOW_STATE_PREF = "showState"
 
-  val pref = Preferences.userNodeForPackage(FecControllerMain.getClass)
+  val pref: Preferences = Preferences.userNodeForPackage(FecControllerMain.getClass)
 
-  val antInterface = new AntTransceiver(1)
-  val antNode = new org.cowboycoders.ant.Node(antInterface)
-
-  val unknownStr: String = "unknown"
+  val antInterface: AntTransceiver = new AntTransceiver(1)
+  val antNode: ant.Node = new org.cowboycoders.ant.Node(antInterface)
 
 
   val power = new StringProperty() {
@@ -134,21 +149,33 @@ object FecControllerMain extends JFXApp {
   }
 
 
-  private def updateCapabilites(caps: Capabilities) = {
+  private val equipmentState: LabelValuePair = LabelValuePair("Equipment state")
+  private val calibrationSpeedState: LabelValuePair = LabelValuePair("Speed condition")
+  private val calibrationTargetSpeed: LabelValuePair = LabelValuePair("Target Speed")
+  private val calibrationTargetSpin: LabelValuePair = LabelValuePair("Target Spindown time")
+  private val tempCondition: LabelValuePair = LabelValuePair("Temperature status")
+  private val calibrationSpinDown: LabelValuePair = LabelValuePair("Spindown time")
+  private val calibrationZeroOffset: LabelValuePair = LabelValuePair("Zero offset")
+  private val temperature: LabelValuePair = LabelValuePair("Temperature")
+  private val calibrationSuccess: LabelValuePair = LabelValuePair("Calibration success")
+  private val coastingPair: LabelValuePair = LabelValuePair("Coasting")
+
+
+  private def updateCapabilites(caps: Capabilities): Unit = {
     supportBasicState.value = boolToStr(caps.isBasicResistanceModeSupported)
     supportPowerState.value = boolToStr(caps.isTargetPowerModeSupported)
     supportSimulationState.value = boolToStr(caps.isSimulationModeSupported)
     maxResistanceState.value = Option(caps.getMaximumResistance).map(_.toString).getOrElse(unknownStr)
   }
 
-  private def updateConfig(conf: Config) = {
+  private def updateConfig(conf: Config): Unit = {
     userWeightState.value = "%2.2f".format(conf.getUserWeight.floatValue())
     bikeWeightState.value = "%2.2f".format(conf.getBicycleWeight.floatValue())
     gearRatioState.value = "%2.2f".format(conf.getGearRatio.floatValue())
     bicycleWheelDiameterState.value = "%2.2f".format(conf.getBicycleWheelDiameter.floatValue())
   }
 
-  var allToggles = List[DisplayToggle]()
+  var allToggles: List[DisplayToggle] = List[DisplayToggle]()
 
   case class DisplayToggle(key: String, desc: String) {
     val toggle: BooleanProperty = mkPersistentBool(key)
@@ -166,6 +193,7 @@ object FecControllerMain extends JFXApp {
 
 
   // order matters
+  val stateToggle = DisplayToggle(SHOW_STATE_PREF, "State")
   val configToggle = DisplayToggle(SHOW_CONF_PREF, "Config")
   val capabilitiesToggle = DisplayToggle(SHOW_CAPS_PREF, "Capabilities")
   val simulationToggle = DisplayToggle(SHOW_SIMULATION_PREF, "Simulation data")
@@ -204,6 +232,20 @@ object FecControllerMain extends JFXApp {
   )))
 
 
+  val stateCells = Array(GridCellGroup(None, Array (
+    new Cell(equipmentState),
+    new Cell(calibrationSpinDown),
+    new Cell(calibrationZeroOffset),
+    new Cell(calibrationSuccess),
+    new Cell(calibrationSpeedState),
+    new Cell(calibrationTargetSpeed),
+    new Cell(calibrationTargetSpin),
+    new Cell(temperature),
+    new Cell(tempCondition),
+    new Cell(coastingPair)
+  )))
+
+
   val numCols = new IntegerProperty() {
     value = 1
   }
@@ -212,12 +254,19 @@ object FecControllerMain extends JFXApp {
 
   val statusCount = new AtomicInteger(0)
 
-  private def setStatusMsg(a: String) = {
+  private def setStatusMsg(a: String): Unit = {
     val id = statusCount.addAndGet(1)
     statusMessage.value = id + ": " + a
   }
 
   setStatusMsg("No message")
+
+  def decorateWithStatusMsg(button: Button, onAction: EventHandler[event.ActionEvent])
+    : javafx.event.EventHandler[javafx.event.ActionEvent] = (ae : ActionEvent) => {
+      setStatusMsg(button.text.value)
+      onAction.handle(ae)
+    }
+
 
   def genSplit: Parent = {
 
@@ -260,6 +309,7 @@ object FecControllerMain extends JFXApp {
     statsVBox.children += genDecorated(simulationCells, scroll.viewportBounds, simulationToggle.toggle, genGridTitle("Simulation data"))
     statsVBox.children += genDecorated(capabilitiesCells, scroll.viewportBounds, capabilitiesToggle.toggle, genGridTitle("Capabilities"))
     statsVBox.children += genDecorated(configCells, scroll.viewportBounds, configToggle.toggle, genGridTitle("Config"))
+    statsVBox.children += genDecorated(stateCells, scroll.viewportBounds, stateToggle.toggle, genGridTitle("State"))
 
     val powerInput = labelNode(StringProperty("Power"))(
       mkInput(
@@ -380,16 +430,36 @@ object FecControllerMain extends JFXApp {
       maxWidth = Double.MaxValue
     }
 
-    val reqConfigButton = new Button {
-      text = "Request Config"
-      onAction = { (_: ActionEvent) => turbo.requestConfig() }
+    val reqCalibrationButton = new Button {
+      text = "Request calibration (spindown)"
+      onAction = { (_: ActionEvent) => turbo.requestSpinDownCalibration() }
       hgrow = Priority.Always
       maxWidth = Double.MaxValue
     }
 
+    val reqZeroOffsetCalibrationButton = new Button {
+      text = "Request calibration (zero offset)"
+      onAction = { (_: ActionEvent) => turbo.requestZeroOffsetCalibration()}
+      hgrow = Priority.Always
+      maxWidth = Double.MaxValue
+    }
+
+    val reqConfigButton = new Button {
+      text = "Request Config"
+      onAction =  (_: ActionEvent) => turbo.requestConfig()
+      hgrow = Priority.Always
+      maxWidth = Double.MaxValue
+    }
+
+    val requestButtons = Seq(reqCapsButton,reqConfigButton, reqCalibrationButton, reqZeroOffsetCalibrationButton)
+
+    for (button <- requestButtons) {
+      button.onAction = decorateWithStatusMsg(button, button.onAction.getValue)
+    }
+
     //groups buttons
     val buttonVBox = new VBox() {
-      children = Seq(reqCapsButton,reqConfigButton)
+      children = requestButtons
     }
 
 
@@ -603,9 +673,9 @@ object FecControllerMain extends JFXApp {
 
   implicit def dynamicTable2(a: DynamicTable): Node = a.grid
 
-  val split = genSplit
+  val split: Parent = genSplit
 
-  val theScene = new Scene {
+  val theScene: Scene = new Scene {
     root = split
   }
 
@@ -625,6 +695,8 @@ object FecControllerMain extends JFXApp {
 
   // this stuff is last to ensure all variables are initialised
 
+  private val progressStr = "in progress"
+
   val turbo = new FecProfile {
     override def onCapabilitiesReceived(capabilities: Capabilities): Unit = {
       updateCapabilites(capabilities)
@@ -634,13 +706,34 @@ object FecControllerMain extends JFXApp {
       updateConfig(config)
     }
 
-    override def onEquipmentStateChange(equipmentState: Defines.EquipmentState, equipmentState1: Defines.EquipmentState): Unit = {
-
+    override def onEquipmentStateChange(oldState: Defines.EquipmentState, newState: Defines.EquipmentState): Unit = {
+      equipmentState.value.value = newState.toString()
     }
 
-    override def onCalibrationUpdate(calibrationProgress: CalibrationProgress): Unit = {
 
+
+    override def onCalibrationUpdate(progress: CalibrationProgress): Unit = {
+      calibrationSpeedState.value.value = Try(progress.getSpeedState()).map(_.toString()).getOrElse("null")
+      calibrationTargetSpin.value.value = Try(progress.getTargetSpinDownTime()).map(_.toString()).getOrElse("null")
+      calibrationTargetSpeed.value.value = Try(progress.getTargetSpeed()).map(_.toString()).getOrElse("null")
+      calibrationSpinDown.value.value = if (progress.isSpinDownPending()) progressStr else unknownStr
+      calibrationZeroOffset.value.value = if (progress.isOffsetPending()) progressStr else unknownStr
+      tempCondition.value.value = Try(progress.getTempState()).map(_.toString()).getOrElse("null")
+      temperature.value.value = temperatureToString(progress.getTemp())
     }
+
+    override def onCalibrationStatusReceieved(calibrationResponse: CalibrationResponse) = {
+      calibrationSpinDown.value.value = Try(calibrationResponse.getSpinDownTime()).map(_.toString()).getOrElse("null")
+      calibrationZeroOffset.value.value = Try(calibrationResponse.getZeroOffset()).map(_.toString()).getOrElse("null")
+      temperature.value.value = temperatureToString(calibrationResponse.getTemp())
+      calibrationSuccess.value.value = boolToStr(calibrationResponse.isSpinDownSuccess() || calibrationResponse.isZeroOffsetSuccess)
+    }
+  }
+
+  private def temperatureToString(progress: java.math.BigDecimal) = {
+    Try(progress)
+      .map((x: java.math.BigDecimal) => "%2.2f".format(x.floatValue()))
+      .getOrElse("null")
   }
 
   val turboThread = new Thread() {
@@ -651,8 +744,6 @@ object FecControllerMain extends JFXApp {
       turbo.start(antNode)
     }
   }
-
-  private val prioritisedTimeout = TimeUnit.SECONDS.toNanos(1)
 
   private val prioritisedBus = new FilteredBroadcastMessenger[TaggedTelemetryEvent]()
 
@@ -665,8 +756,7 @@ object FecControllerMain extends JFXApp {
         .createPrioritisedEvent(),
     new PrioritisedEventBuilder(classOf[CoastEvent])
       .setTagPriorities(classOf[TrainerData], classOf[TorqueData])
-      .createPrioritisedEvent()
-
+      .createInheritedPrioritisedEvent()
   )
 
 
@@ -705,12 +795,18 @@ object FecControllerMain extends JFXApp {
   })
 
   prioritisedBus.addListener(classOf[CoastDetectedEvent], (v: CoastDetectedEvent) => {
-    println("coast from: " + v.getTag())
+    coastingPair.value.value = boolToStr(true)
+  })
+
+  prioritisedBus.addListener(classOf[CoastEndEvent], (v: CoastEndEvent) => {
+    coastingPair.value.value = boolToStr(false)
   })
 
   prioritisedBus.addListener(classOf[LapUpdate], (v:LapUpdate) => {
-    laps.value = "%d".format(v.getLaps)
+    laps.value = "%d".format(v.getLaps())
   })
+
+
 
 
   turboThread.start()
