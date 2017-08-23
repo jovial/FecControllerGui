@@ -2,6 +2,7 @@
   * Created by fluxoid on 17/02/17.
   */
 
+import java.util
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.prefs.Preferences
 import javafx.event
@@ -14,12 +15,13 @@ import org.cowboycoders.ant.profiles.FecProfile
 import org.cowboycoders.ant.profiles.common.FilteredBroadcastMessenger
 import org.cowboycoders.ant.profiles.common.events._
 import org.cowboycoders.ant.profiles.common.events.interfaces.TaggedTelemetryEvent
+import org.cowboycoders.ant.profiles.fitnessequipment.Defines.TrainerStatusFlag
 import org.cowboycoders.ant.profiles.fitnessequipment.pages._
 import org.cowboycoders.ant.profiles.fitnessequipment.{Capabilities, Config, ConfigBuilder, Defines}
 
 import scala.language.implicitConversions
 import scala.util.Try
-import scalafx.Includes._
+import scalafx.Includes.{when, _}
 import scalafx.application.{JFXApp, Platform}
 import scalafx.beans.binding.{Bindings, ObjectBinding}
 import scalafx.beans.property.{BooleanProperty, IntegerProperty, ObjectProperty, StringProperty}
@@ -47,7 +49,7 @@ case class Cell(label: String, value: StringProperty) {
   }
 }
 
-case class GridCellGroup(enabled: Option[BooleanProperty], cells: Array[Cell])
+case class GridCellGroup(enabled: Option[BooleanProperty], cells: Seq[Cell])
 
 object FecControllerMain extends JFXApp {
   val unknownStr: String = "unknown"
@@ -235,7 +237,6 @@ object FecControllerMain extends JFXApp {
     Cell(gearRatioLabel, gearRatioState)
   )))
 
-
   val stateCells = Array(GridCellGroup(None, Array (
     new Cell(equipmentState),
     new Cell(calibrationSpinDown),
@@ -249,6 +250,30 @@ object FecControllerMain extends JFXApp {
     new Cell(coastingPair)
   )))
 
+  def boolToStr(b: BooleanProperty): StringProperty = {
+    val res = new StringProperty()
+    res <== when (b) choose boolToStr(true) otherwise boolToStr(false)
+    res
+  }
+
+  val trainerStatusProp = new ObjectProperty[util.EnumSet[TrainerStatusFlag]] {
+    value = util.EnumSet.noneOf(classOf[TrainerStatusFlag])
+  }
+
+  val trainerFlagToState: Map[TrainerStatusFlag, BooleanProperty] = TrainerStatusFlag.values()
+    .zip(TrainerStatusFlag.values().map(_ => new BooleanProperty() { value = false })).toMap
+
+  trainerStatusProp.onChange {
+    (_,_, n) => {
+      for (flag <- TrainerStatusFlag.values()) {
+        trainerFlagToState(flag).value = n.contains(flag)
+      }
+    }
+  }
+
+  val trainerStatusCells = Array(
+    GridCellGroup(None, TrainerStatusFlag.values().map(flag => Cell(flag.toString(), boolToStr(trainerFlagToState(flag)))))
+  )
 
   val numCols = new IntegerProperty() {
     value = 1
@@ -314,6 +339,7 @@ object FecControllerMain extends JFXApp {
     statsVBox.children += genDecorated(capabilitiesCells, scroll.viewportBounds, capabilitiesToggle.toggle, genGridTitle("Capabilities"))
     statsVBox.children += genDecorated(configCells, scroll.viewportBounds, configToggle.toggle, genGridTitle("Config"))
     statsVBox.children += genDecorated(stateCells, scroll.viewportBounds, stateToggle.toggle, genGridTitle("State"))
+    statsVBox.children += genDecorated(trainerStatusCells, scroll.viewportBounds, stateToggle.toggle, genGridTitle("Trainer status"))
 
     val powerInput = labelNode(StringProperty("Power"))(
       mkInput(
@@ -740,6 +766,10 @@ object FecControllerMain extends JFXApp {
     override def onDisconnect() = {
       connected.value = false
     }
+
+    override def onStatusChange(oldValue: util.EnumSet[Defines.TrainerStatusFlag], newValue: util.EnumSet[Defines.TrainerStatusFlag]) = {
+      trainerStatusProp.value = newValue
+    }
   }
 
   private def temperatureToString(progress: java.math.BigDecimal) = {
@@ -776,7 +806,6 @@ object FecControllerMain extends JFXApp {
 
   turbo.getDataHub.addListener(classOf[TaggedTelemetryEvent], prioritiser)
 
-
   prioritisedBus.addListener(classOf[AveragePowerUpdate], (v: AveragePowerUpdate) => {
     powerAvg.value = "%2.2f".format(v.getAveragePower.floatValue())
   })
@@ -802,9 +831,9 @@ object FecControllerMain extends JFXApp {
     cadence.value = "%d".format(v.getCadence)
   })
 
-  prioritisedBus.addListener(classOf[TaggedTelemetryEvent], (v: TaggedTelemetryEvent) => {
+  //prioritisedBus.addListener(classOf[TaggedTelemetryEvent], (v: TaggedTelemetryEvent) => {
     //println(s"tag:${v.getTag}, event:$v")
-  })
+  //})
 
   prioritisedBus.addListener(classOf[CoastDetectedEvent], (v: CoastDetectedEvent) => {
     coastingPair.value.value = boolToStr(true)
